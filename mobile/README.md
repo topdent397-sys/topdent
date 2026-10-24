@@ -6,7 +6,7 @@ This folder is a real React Native/Expo Android client. It does **not** use WebV
 
 ```bash
 npm ci
-EXPO_PUBLIC_API_URL=https://fyfikbj-production.up.railway.app/api npx expo start
+EXPO_PUBLIC_API_URL=https://fyfikbj.onrender.com/api npx expo start
 ```
 
 ## Build APK with GitHub Actions

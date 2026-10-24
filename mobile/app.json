@@ -26,7 +26,7 @@
       "expo-asset"
     ],
     "extra": {
-      "apiUrl": "https://fyfikbj-production.up.railway.app/api"
+      "apiUrl": "https://fyfikbj.onrender.com/api"
     }
   }
 }
