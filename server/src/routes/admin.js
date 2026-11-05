@@ -4,7 +4,7 @@ import { verifyToken, requireRole } from '../middleware/auth.js';
 import { requirePermission } from '../middleware/permissions.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler, AppError, audit, notify, pageRange } from '../lib/http.js';
-import { adminUserSchema, approvalSchema, bannerSchema, createCategorySchema, createDiscountSchema, createOfferSchema, createSubCategorySchema, idParamsSchema, paymentReviewSchema, provinceSchema, settingSchema } from '../validation/schemas.js';
+import { adminUserSchema, approvalSchema, bannerSchema, createCategorySchema, createDiscountSchema, createOfferSchema, createSubCategorySchema, idParamsSchema, paymentReviewSchema, provinceSchema, settingSchema, updateBannerSchema, updateOfferSchema } from '../validation/schemas.js';
 
 const router = express.Router();
 // Retained for backwards-compatible operations. New administration uses
@@ -238,13 +238,49 @@ router.post('/offers', validate({ body: createOfferSchema }), asyncHandler(async
   await audit(req.user.id, 'offer_created', 'offer', offer.id);
   res.status(201).json({ offer });
 }));
+router.patch('/offers/:id', validate({ params: idParamsSchema, body: updateOfferSchema }), asyncHandler(async (req, res) => {
+  const body = req.body;
+  const updates = { ...(body.title !== undefined ? { title: body.title } : {}), ...(body.description !== undefined ? { description: body.description || null } : {}), ...(body.imageUrl !== undefined ? { image_url: body.imageUrl } : {}), ...(body.merchantId !== undefined ? { merchant_id: body.merchantId || null } : {}), ...(body.startsAt !== undefined ? { starts_at: body.startsAt?.toISOString() || null } : {}), ...(body.endsAt !== undefined ? { ends_at: body.endsAt?.toISOString() || null } : {}), ...(body.orderIndex !== undefined ? { order_index: body.orderIndex } : {}), ...(body.isActive !== undefined ? { is_active: body.isActive } : {}), updated_at: new Date().toISOString() };
+  const { data, error } = await supabaseAdmin.from('offers').update(updates).eq('id', req.params.id).select().single();
+  if (error) throw error;
+  if (body.productIds !== undefined) {
+    await supabaseAdmin.from('offer_products').delete().eq('offer_id', req.params.id);
+    if (body.productIds.length) {
+      const { error: linksError } = await supabaseAdmin.from('offer_products').insert(body.productIds.map((productId) => ({ offer_id: req.params.id, product_id: productId })));
+      if (linksError) throw linksError;
+    }
+  }
+  await audit(req.user.id, 'offer_updated', 'offer', data.id);
+  res.json({ offer: data });
+}));
+router.delete('/offers/:id', validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
+  const { error } = await supabaseAdmin.from('offers').delete().eq('id', req.params.id);
+  if (error) throw error;
+  await audit(req.user.id, 'offer_deleted', 'offer', req.params.id);
+  res.json({ message: 'تم حذف العرض بنجاح' });
+}));
 
 router.get('/banners', asyncHandler(async (req, res) => list('banners', req.query, res)));
 router.post('/banners', validate({ body: bannerSchema }), asyncHandler(async (req, res) => {
-  const { data, error } = await supabaseAdmin.from('banners').insert({ title: req.body.title || null, image_url: req.body.imageUrl, link_url: req.body.linkUrl || null, order_index: req.body.orderIndex, is_active: req.body.isActive }).select().single();
+  const { data, error } = await supabaseAdmin.from('banners').insert({ title: req.body.title || null, image_url: req.body.imageUrl, link_url: req.body.linkUrl || null, offer_id: req.body.offerId || null, product_id: req.body.productId || null, order_index: req.body.orderIndex, is_active: req.body.isActive }).select().single();
   if (error) throw error;
   await audit(req.user.id, 'banner_created', 'banner', data.id);
   res.status(201).json({ banner: data });
+}));
+router.patch('/banners/:id', validate({ params: idParamsSchema, body: updateBannerSchema }), asyncHandler(async (req, res) => {
+  const mapping = { title: req.body.title, image_url: req.body.imageUrl, link_url: req.body.linkUrl, offer_id: req.body.offerId, product_id: req.body.productId, order_index: req.body.orderIndex, is_active: req.body.isActive };
+  const updates = Object.fromEntries(Object.entries(mapping).filter(([, v]) => v !== undefined));
+  updates.updated_at = new Date().toISOString();
+  const { data, error } = await supabaseAdmin.from('banners').update(updates).eq('id', req.params.id).select().single();
+  if (error) throw error;
+  await audit(req.user.id, 'banner_updated', 'banner', data.id);
+  res.json({ banner: data });
+}));
+router.delete('/banners/:id', validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
+  const { data, error } = await supabaseAdmin.from('banners').delete().eq('id', req.params.id).select().single();
+  if (error) throw error;
+  await audit(req.user.id, 'banner_deleted', 'banner', req.params.id);
+  res.json({ message: 'تم حذف البنر بنجاح' });
 }));
 
 router.get('/settings', asyncHandler(async (req, res) => {

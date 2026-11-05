@@ -14,13 +14,22 @@ router.get('/settings', asyncHandler(async (req, res) => {
 router.get('/banners', asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('banners')
-    .select('id, title, image_url, link_url, order_index')
+    .select('id, title, image_url, link_url, order_index, offer_id')
     .eq('is_active', true)
     .order('order_index', { ascending: true });
   if (error) throw error;
   res.json({ banners: data || [] });
 }));
 
+router.get('/companies', asyncHandler(async (req, res) => {
+  const { data, error } = await supabaseAdmin
+    .from('merchants')
+    .select('id, company_name, logo_url, province, area, is_personal_seller')
+    .eq('is_active', true)
+    .order('company_name', { ascending: true });
+  if (error) throw error;
+  res.json({ companies: data || [] });
+}));
 router.get('/categories', asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('categories')

@@ -25,8 +25,8 @@ export const registerSchema = z.object({
   fullName: trimmedString(6, 255),
   phone,
   whatsapp: phone.optional().or(z.literal('')).transform((value) => value || undefined),
-  province: trimmedString(2, 100),
-  area: trimmedString(2, 150),
+  province: optionalText(100),
+  area: optionalText(150),
   address: optionalText(500),
   universityClinic: optionalText(255),
   acceptTerms: z.literal(true),
@@ -62,6 +62,7 @@ export const changePasswordSchema = z.object({
 
 const productFields = {
   name: trimmedString(2, 255),
+  nameEn: optionalText(255),
   code: trimmedString(1, 100).optional(),
   category: trimmedString(1, 100),
   subCategory: optionalText(100),
@@ -81,14 +82,18 @@ const productFields = {
   maintenanceDetails: optionalText(5000),
   deliverySameProvince: z.boolean().default(true),
   shippingOtherProvince: z.boolean().default(true),
+  deliveryInsideProvince: z.boolean().default(true),
+  deliveryOutsideProvince: z.boolean().default(true),
   deliveryProvider: z.enum(['auto', 'merchant', 'platform']).default('auto'),
-  sellerProvince: trimmedString(2, 100),
-  sellerArea: trimmedString(2, 150),
+  sellerProvince: optionalText(100),
+  sellerArea: optionalText(150),
   sellerUniversity: optionalText(255),
   usageDurationMonths: z.coerce.number().int().min(0).max(1200).optional().nullable(),
   defects: optionalText(10000),
   sellerDeclaration: z.boolean().default(false),
   platformFeeAccepted: z.boolean().default(false),
+  stockByProvince: z.record(z.coerce.number().int().min(0)).optional().default({}),
+  sellerProvinces: z.array(z.string().trim().min(2).max(100)).max(30).optional().default([]),
   metadata: z.record(z.unknown()).optional().default({})
 };
 
@@ -180,7 +185,7 @@ export const moneyReceiptSchema = z.object({ recipientName: trimmedString(2, 255
 
 export const userProfileSchema = z.object({
   fullName: trimmedString(6, 255), phone, whatsapp: phone.optional().or(z.literal('')).transform((value) => value || null),
-  province: trimmedString(2, 100), area: trimmedString(2, 150), address: optionalText(500), universityClinic: optionalText(255), avatarUrl: optionalUrl
+  province: optionalText(100), area: optionalText(150), address: optionalText(500), universityClinic: optionalText(255), avatarUrl: optionalUrl
 }).strict();
 
 export const merchantProfileSchema = z.object({
@@ -205,15 +210,17 @@ export const createDiscountSchema = z.object({
   if ((discountPercentage === undefined) === (discountAmount === undefined)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['discountPercentage'], message: 'حدد نسبة أو مبلغ الخصم فقط' });
   if (startsAt && expiresAt && expiresAt <= startsAt) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['expiresAt'], message: 'تاريخ الانتهاء يجب أن يكون بعد البداية' });
 });
-export const createOfferSchema = z.object({ title: trimmedString(2, 255), description: optionalText(5000), imageUrl: imagePath, merchantId: uuid.optional().nullable(), productIds: z.array(uuid).max(100).default([]), startsAt: date.optional().nullable(), endsAt: date.optional().nullable(), orderIndex: z.coerce.number().int().min(0).max(10000).default(0), isActive: z.boolean().default(true) }).strict().refine((value) => !value.startsAt || !value.endsAt || value.endsAt > value.startsAt, { path: ['endsAt'], message: 'تاريخ النهاية يجب أن يكون بعد البداية' });
-
+const offerFields = { title: trimmedString(2, 255), description: optionalText(5000), imageUrl: imagePath, merchantId: uuid.optional().nullable(), productIds: z.array(uuid).max(100).default([]), startsAt: date.optional().nullable(), endsAt: date.optional().nullable(), orderIndex: z.coerce.number().int().min(0).max(10000).default(0), isActive: z.boolean().default(true) };
+export const createOfferSchema = z.object(offerFields).strict().refine((value) => !value.startsAt || !value.endsAt || value.endsAt > value.startsAt, { path: ['endsAt'], message: 'تاريخ النهاية يجب أن يكون بعد البداية' });
 export const reportProductSchema = z.object({ reason: trimmedString(3, 100), details: optionalText(2000) }).strict();
 export const rentalRequestSchema = z.object({ rentalId: uuid, startsOn: date, endsOn: date, notes: optionalText(2000) }).strict().refine((value) => value.endsOn >= value.startsOn, { path: ['endsOn'], message: 'تاريخ النهاية يجب أن يكون بعد البداية' });
 export const createRentalSchema = z.object({ productId: uuid, dailyPrice: positiveMoney.optional().nullable(), weeklyPrice: positiveMoney.optional().nullable(), depositAmount: money.default(0), returnTerms: trimmedString(5, 5000), lateFeePerDay: money.default(0), isActive: z.boolean().default(true) }).strict().refine((value) => value.dailyPrice || value.weeklyPrice, { message: 'حدد سعر اليوم أو الأسبوع' });
 export const dentalCardRequestSchema = z.object({ doctorName: trimmedString(3, 255), specialty: optionalText(255), phone, address: optionalText(500), email: z.string().trim().email().max(255).optional().nullable(), logoUrl: imagePath.optional().nullable(), colors: optionalText(255), requestedText: optionalText(5000), requestedTemplate: optionalText(100), attachments: z.array(imagePath).max(10).default([]) }).strict();
 export const dentalCardQuoteSchema = z.object({ quotedPrice: positiveMoney, executionDays: z.coerce.number().int().min(1).max(365), includedRevisions: z.coerce.number().int().min(0).max(50).default(0), status: z.enum(['quoted', 'in_progress', 'revision', 'completed', 'cancelled']), adminNote: optionalText(5000) }).strict();
 export const adminUserSchema = z.object({ role: z.enum(['customer', 'merchant', 'manager', 'driver', 'admin']).optional(), isActive: z.boolean().optional() }).strict().refine((value) => value.role !== undefined || value.isActive !== undefined, 'حدد تغييراً واحداً على الأقل');
-export const bannerSchema = z.object({ title: optionalText(255), imageUrl: imagePath, linkUrl: z.string().trim().max(500).optional().nullable(), orderIndex: z.coerce.number().int().min(0).max(10000).default(0), isActive: z.boolean().default(true) }).strict();
+export const bannerSchema = z.object({ title: optionalText(255), imageUrl: imagePath, linkUrl: z.string().trim().max(500).optional().nullable(), offerId: uuid.optional().nullable(), productId: uuid.optional().nullable(), orderIndex: z.coerce.number().int().min(0).max(10000).default(0), isActive: z.boolean().default(true) }).strict();
+export const updateBannerSchema = bannerSchema.partial().strict();
+export const updateOfferSchema = z.object(offerFields).partial().strict();
 export const settingSchema = z.object({ key: z.string().trim().min(2).max(255).regex(/^[A-Za-z0-9_.-]+$/), value: z.string().trim().max(20000) }).strict();
 export const paymentReviewSchema = z.object({ approved: z.boolean(), note: optionalText(2000) }).strict();
 export const provinceSchema = z.object({ name: trimmedString(2, 100), isActive: z.boolean().default(true) }).strict();
@@ -255,4 +262,4 @@ export const deliveryIssueSchema = z.object({ issueType: z.enum(['customer_not_a
 export const notificationBroadcastSchema = z.object({ title: trimmedString(2, 255), message: trimmedString(1, 5000), type: z.string().trim().min(2).max(50).default('admin'), userIds: z.array(uuid).max(1000).optional().default([]), companyId: uuid.optional().nullable(), allUsers: z.boolean().optional().default(false), orderId: uuid.optional().nullable() }).strict();
 export const productStatusSchema = z.object({ status: z.enum(['approved', 'rejected', 'inactive', 'archive']), reason: optionalText(1000) }).strict();
 export const platformUserCreateSchema = z.object({ email: z.string().trim().email().max(255).transform((value) => value.toLowerCase()), password: z.string().min(12).max(128), fullName: trimmedString(6, 255), phone: phone.optional().nullable(), whatsapp: phone.optional().nullable(), province: optionalText(100), area: optionalText(150), address: optionalText(500), companyId: uuid.optional().nullable() }).strict();
-export const platformProductUpdateSchema = z.object({ name: trimmedString(2, 255).optional(), description: trimmedString(10, 10000).optional(), price: positiveMoney.optional(), stockQuantity: z.coerce.number().int().min(0).max(1000000).optional(), isActive: z.boolean().optional(), status: z.enum(['pending', 'approved', 'rejected', 'inactive']).optional() }).strict().refine((value) => Object.keys(value).length > 0, 'حدد حقلاً واحداً على الأقل');
+export const platformProductUpdateSchema = z.object({ name: trimmedString(2, 255).optional(), nameEn: optionalText(255), description: trimmedString(10, 10000).optional(), price: positiveMoney.optional(), stockQuantity: z.coerce.number().int().min(0).max(1000000).optional(), manufacturer: optionalText(255), countryOfOrigin: optionalText(100), deliveryInsideProvince: z.boolean().optional(), deliveryOutsideProvince: z.boolean().optional(), stockByProvince: z.record(z.coerce.number().int().min(0)).optional(), sellerProvinces: z.array(z.string().trim().min(2).max(100)).max(30).optional(), isActive: z.boolean().optional(), status: z.enum(['pending', 'approved', 'rejected', 'inactive']).optional() }).strict().refine((value) => Object.keys(value).length > 0, 'حدد حقلاً واحداً على الأقل');

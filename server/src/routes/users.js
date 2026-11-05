@@ -71,27 +71,30 @@ router.get('/listings', requireRole(['customer']), asyncHandler(async (req, res)
   const { data: merchant, error } = await supabaseAdmin.from('merchants').select('id').eq('user_id', req.user.id).maybeSingle();
   if (error) throw error;
   if (!merchant) return res.json({ products: [] });
-  const { data, error: productsError } = await supabaseAdmin.from('products').select('*, images:product_images(image_url, is_primary)').eq('merchant_id', merchant.id).eq('condition', 'used').order('created_at', { ascending: false });
+  let query = supabaseAdmin.from('products').select('*, images:product_images(image_url, is_primary)').eq('merchant_id', merchant.id);
+  if (req.query.condition) query = query.eq('condition', req.query.condition);
+  const { data, error: productsError } = await query.order('created_at', { ascending: false });
   if (productsError) throw productsError;
   res.json({ products: data || [] });
 }));
 
 router.post('/listings', requireRole(['customer']), validate({ body: createProductSchema }), asyncHandler(async (req, res) => {
-  if (req.body.condition !== 'used') throw new AppError(400, 'يمكن للحساب الشخصي عرض منتجات مستعملة فقط', 'USED_ONLY_LISTING');
   const merchant = await personalMerchant(req.user);
   const rate = Number(merchant.dollar_rate || 1);
   const { data: assets, error: assetsError } = await supabaseAdmin.from('media_assets').select('public_url').in('public_url', req.body.images).eq('owner_id', req.user.id);
   if (assetsError) throw assetsError;
   if ((assets || []).length !== req.body.images.length) throw new AppError(400, 'استخدم صوراً مرفوعة من حسابك فقط', 'IMAGE_OWNERSHIP_REQUIRED');
+  const condition = req.body.condition || 'new';
   const { data: product, error } = await supabaseAdmin.from('products').insert({
     merchant_id: merchant.id,
     name: req.body.name,
-    code: req.body.code || `USED-${Date.now().toString(36).toUpperCase()}`,
+    name_en: req.body.nameEn ?? req.body.name_en ?? null,
+    code: req.body.code || (condition === 'new' ? 'NEW-' : 'USED-') + Date.now().toString(36).toUpperCase(),
     category: req.body.category,
     sub_category: req.body.subCategory || null,
     description: req.body.description,
     specifications: req.body.specifications || null,
-    condition: 'used',
+    condition,
     price: req.body.price,
     original_price: req.body.price,
     currency: req.body.currency,
@@ -104,12 +107,16 @@ router.post('/listings', requireRole(['customer']), validate({ body: createProdu
     seller_area: req.body.sellerArea,
     delivery_same_province: true,
     shipping_other_province: true,
+    delivery_inside_province: req.body.deliveryInsideProvince ?? req.body.deliverySameProvince ?? true,
+    delivery_outside_province: req.body.deliveryOutsideProvince ?? req.body.shippingOtherProvince ?? true,
     delivery_provider: 'auto',
     seller_university: req.body.sellerUniversity || null,
-    usage_duration_months: req.body.usageDurationMonths,
-    defects: req.body.defects,
+    usage_duration_months: req.body.usageDurationMonths ?? null,
+    defects: req.body.defects || null,
     seller_declaration: true,
     platform_fee_accepted: true,
+    stock_by_province: req.body.stockByProvince ?? req.body.stock_by_province ?? {},
+    seller_provinces: req.body.sellerProvinces ?? req.body.seller_provinces ?? [],
     is_active: true,
     is_approved: false,
     status: 'pending',
@@ -119,8 +126,8 @@ router.post('/listings', requireRole(['customer']), validate({ body: createProdu
   const { error: imageError } = await supabaseAdmin.from('product_images').insert(req.body.images.map((imageUrl, index) => ({ product_id: product.id, image_url: imageUrl, is_primary: index === 0, created_by: req.user.id })));
   if (imageError) throw imageError;
   await markMediaAssetsAttached(req.body.images);
-  await audit(req.user.id, 'used_product_submitted', 'product', product.id);
-  res.status(201).json({ message: 'تم إرسال المنتج المستعمل للمراجعة', productId: product.id });
+  await audit(req.user.id, condition === 'new' ? 'new_product_submitted' : 'used_product_submitted', 'product', product.id);
+  res.status(201).json({ message: 'تم إرسال المنتج للمراجعة', productId: product.id });
 }));
 
 export default router;

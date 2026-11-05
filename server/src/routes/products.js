@@ -24,6 +24,7 @@ function productPayload(body, merchant) {
   const originalPrice = Number(body.price);
   return {
     name: body.name,
+    name_en: body.nameEn ?? body.name_en ?? null,
     code: body.code || `TD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
     category: body.category,
     sub_category: body.subCategory || null,
@@ -45,6 +46,8 @@ function productPayload(body, merchant) {
     maintenance_details: body.maintenanceDetails || null,
     delivery_same_province: true,
     shipping_other_province: true,
+    delivery_inside_province: body.deliveryInsideProvince ?? body.delivery_inside_province ?? true,
+    delivery_outside_province: body.deliveryOutsideProvince ?? body.delivery_outside_province ?? true,
     delivery_provider: body.deliveryProvider || 'auto',
     seller_province: body.sellerProvince,
     seller_area: body.sellerArea,
@@ -53,6 +56,8 @@ function productPayload(body, merchant) {
     defects: body.defects || null,
     seller_declaration: body.sellerDeclaration,
     platform_fee_accepted: body.platformFeeAccepted,
+    stock_by_province: body.stockByProvince ?? body.stock_by_province ?? {},
+    seller_provinces: body.sellerProvinces ?? body.seller_provinces ?? [],
     metadata: body.metadata || {}
   };
 }
@@ -100,7 +105,7 @@ router.get('/', validate({ query: productQuerySchema }), asyncHandler(async (req
   if (category) query = query.eq('category', category);
   if (subCategory) query = query.eq('sub_category', subCategory);
   if (condition) query = query.eq('condition', condition);
-  if (province) query = query.eq('seller_province', province);
+  if (province) query = query.or(`seller_province.eq.${province},seller_province.is.null`);
   if (university) query = query.ilike('seller_university', `%${university}%`);
   if (minPrice !== undefined) query = query.gte('price_syp', minPrice);
   if (maxPrice !== undefined) query = query.lte('price_syp', maxPrice);
@@ -111,7 +116,7 @@ router.get('/', validate({ query: productQuerySchema }), asyncHandler(async (req
   if (createdAfter) query = query.gte('created_at', createdAfter.toISOString());
   if (search) {
     const escaped = search.replace(/[,()]/g, ' ');
-    query = query.or(`name.ilike.%${escaped}%,code.ilike.%${escaped}%,description.ilike.%${escaped}%`);
+    query = query.or(`name.ilike.%${escaped}%,name_en.ilike.%${escaped}%,code.ilike.%${escaped}%,description.ilike.%${escaped}%`);
   }
   if (offers === 'true') {
     const { data: links, error } = await supabaseAdmin.from('offer_products').select('product_id, offer:offers!inner(is_active, starts_at, ends_at)').eq('offer.is_active', true);
@@ -198,6 +203,11 @@ router.put('/:id', verifyToken, requirePermission('products.update'), validate({
     usageDurationMonths: req.body.usageDurationMonths ?? product.usage_duration_months,
     sellerDeclaration: req.body.sellerDeclaration ?? product.seller_declaration,
     platformFeeAccepted: req.body.platformFeeAccepted ?? product.platform_fee_accepted,
+    nameEn: req.body.nameEn ?? product.name_en,
+    stockByProvince: req.body.stockByProvince ?? product.stock_by_province,
+    sellerProvinces: req.body.sellerProvinces ?? product.seller_provinces,
+    deliveryInsideProvince: req.body.deliveryInsideProvince ?? product.delivery_inside_province,
+    deliveryOutsideProvince: req.body.deliveryOutsideProvince ?? product.delivery_outside_province,
     metadata: req.body.metadata ?? product.metadata
   }, merchant);
   updates.status = 'pending';
