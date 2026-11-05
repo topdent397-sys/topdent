@@ -6,7 +6,7 @@ on:
       api_url:
         description: 'Backend API URL including /api'
         required: false
-        default: 'https://fyfikbj.onrender.com/api'
+        default: 'https://topdent-production-654a.up.railway.app/api'
         type: string
   push:
     branches: [main]
