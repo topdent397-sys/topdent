@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://fyfikbj.onrender.com/api';
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://topdent-production-654a.up.railway.app/api';
 const api = axios.create({ baseURL: API_URL, timeout: 20000, headers: { 'Content-Type': 'application/json' } });
 api.interceptors.request.use(async (config) => {
   const token = await AsyncStorage.getItem('token');
