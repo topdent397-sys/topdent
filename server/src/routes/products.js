@@ -99,7 +99,8 @@ router.get('/', validate({ query: productQuerySchema }), asyncHandler(async (req
   const { category, subCategory, condition, province, university, minPrice, maxPrice, currency, minUsageMonths, maxUsageMonths, expiresBefore, createdAfter, sortBy, search, offers } = req.query;
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
   let query = supabaseAdmin.from('products').select(`
-    *, merchant:merchants!inner(id, company_name, logo_url, province, area), images:product_images(image_url, is_primary)
+    id, name, name_en, condition, price, currency, price_syp, stock_quantity, seller_provinces, stock_by_province, created_at,
+    merchant:merchants!inner(id, company_name, logo_url, province, area), images:product_images(image_url, is_primary)
   `, { count: 'exact' }).eq('is_active', true).eq('is_approved', true).eq('status', 'approved');
 
   if (category) query = query.eq('category', category);

@@ -3,10 +3,13 @@ import api from '@/lib/api';
 const apiBase = api.defaults.baseURL || '';
 const apiOrigin = apiBase.replace(/\/api\/?$/, '');
 
-export function mediaUrl(value) {
+export function mediaUrl(value, options = {}) {
   if (!value) return '/placeholder.svg';
-  if (/^(https?:|data:|blob:)/i.test(value)) return value;
-  return `${apiOrigin}${value.startsWith('/') ? '' : '/'}${value}`;
+  const rawUrl = /^(https?:|data:|blob:)/i.test(value) ? value : `${apiOrigin}${value.startsWith('/') ? '' : '/'}${value}`;
+  if (!options.width || !/\/storage\/v1\/object\/public\//.test(rawUrl)) return rawUrl;
+  const transformed = rawUrl.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/');
+  const params = new URLSearchParams({ width: String(options.width), quality: String(options.quality || 78), resize: 'contain' });
+  return `${transformed}?${params.toString()}`;
 }
 
 export function formatMoney(value, currency = 'SYP') {
