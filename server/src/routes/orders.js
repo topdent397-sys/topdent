@@ -6,6 +6,7 @@ import { requireAnyPermission, requirePermission } from '../middleware/permissio
 import { validate } from '../middleware/validate.js';
 import { asyncHandler, AppError, audit, normalizeArabic, pageRange, notify } from '../lib/http.js';
 import { assertOrderAccess, getOrderWithRelations, roleCanTransition, transitionOrder } from '../lib/orderWorkflow.js';
+import { assertCompanyScope } from '../middleware/scope.js';
 import { assignDriverSchema, createOrderSchema, driverProofSchema, idParamsSchema, moneyReceiptSchema, orderQuoteSchema, orderStatusSchema } from '../validation/schemas.js';
 
 const router = express.Router();
@@ -271,6 +272,7 @@ router.get('/customer/my-orders', verifyToken, requireRole(['customer']), asyncH
 router.get('/manager/queue', verifyToken, requireRole(['manager', 'admin']), asyncHandler(async (req, res) => {
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
   let query = supabaseAdmin.from('orders').select('*, customer:users(full_name, phone, province, address), merchant:merchants(company_name), items:order_items(*)', { count: 'exact' }).eq('order_type', 'merchant');
+  if (!req.user.hasGlobalScope) query = query.in('merchant_id', req.user.companyIds || []);
   if (req.query.status) query = query.eq('status', req.query.status);
   if (req.query.paymentStatus) query = query.eq('payment_status', req.query.paymentStatus);
   const { data, error, count } = await query.order('created_at', { ascending: false }).range(from, to);
@@ -281,10 +283,14 @@ router.get('/manager/queue', verifyToken, requireRole(['manager', 'admin']), asy
 router.get('/manager/drivers', verifyToken, requireRole(['manager', 'admin']), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin
     .from('driver_profiles')
-    .select('id, is_available, user:users(id, full_name, phone, is_active)')
+    .select('id, company_id, is_available, user:users(id, full_name, phone, is_active)')
     .eq('is_available', true)
     .eq('user.is_active', true)
-    .order('created_at', { ascending: false });
+    .then((result) => {
+      if (result.error) throw result.error;
+      const rows = req.user.hasGlobalScope ? (result.data || []) : (result.data || []).filter((driver) => req.user.companyIds?.includes(driver.company_id));
+      return { data: rows, error: null };
+    });
   if (error) throw error;
   res.json({ drivers: data || [] });
 }));
@@ -326,9 +332,11 @@ router.patch('/:id/status', verifyToken, validate({ params: idParamsSchema, body
 router.post('/:id/assign-driver', verifyToken, requireRole(['manager', 'admin']), validate({ params: idParamsSchema, body: assignDriverSchema }), asyncHandler(async (req, res) => {
   const order = await getOrderWithRelations(req.params.id);
   if (order.order_type !== 'merchant') throw new AppError(400, 'يجب تعيين السائق لطلب شركة فرعي', 'PARENT_ORDER_NOT_DELIVERABLE');
+  if (!req.user.hasGlobalScope) assertCompanyScope(req.user, order.merchant_id);
   const { data: driver, error } = await supabaseAdmin.from('driver_profiles').select('*, user:users(id, full_name, is_active)').eq('id', req.body.driverId).maybeSingle();
   if (error) throw error;
   if (!driver?.is_available || !driver.user?.is_active) throw new AppError(409, 'السائق غير متاح', 'DRIVER_UNAVAILABLE');
+  if (!req.user.hasGlobalScope && driver.company_id !== order.merchant_id) throw new AppError(403, 'لا يمكن تعيين سائق من شركة أخرى', 'DRIVER_COMPANY_SCOPE_FORBIDDEN');
   const updated = await transitionOrder({ order, actor: req.user, toStatus: 'assigned_to_driver', reason: req.body.note, extra: { assigned_driver_id: driver.id } });
   const { error: assignmentError } = await supabaseAdmin.from('driver_assignments').insert({ order_id: order.id, driver_id: driver.id, assigned_by: req.user.id, notes: req.body.note || null });
   if (assignmentError) throw assignmentError;
@@ -339,6 +347,9 @@ router.post('/:id/assign-driver', verifyToken, requireRole(['manager', 'admin'])
 async function driverTransition(req, res, status, noteAction) {
   const order = await getOrderWithRelations(req.params.id);
   await assertOrderAccess(order, req.user);
+  const { data: driver, error: driverError } = await supabaseAdmin.from('driver_profiles').select('id').eq('user_id', req.user.id).maybeSingle();
+  if (driverError) throw driverError;
+  if (!driver || order.assigned_driver_id !== driver.id) throw new AppError(403, 'فقط السائق المعيّن يمكنه تحديث هذه المهمة', 'DRIVER_ASSIGNMENT_REQUIRED');
   const assignmentUpdate = status === 'in_delivery' ? { accepted_at: nowIso() } : status === 'arrived' ? { arrived_at: nowIso() } : { delivered_at: nowIso(), notes: req.body.note || null, proof_url: req.body.proofUrl || null };
   const { error } = await supabaseAdmin.from('driver_assignments').update(assignmentUpdate).eq('order_id', order.id).eq('active', true);
   if (error) throw error;

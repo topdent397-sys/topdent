@@ -3,11 +3,13 @@ import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { apiError, formatDate } from '@/lib/format';
+import { useAuth } from '@/context/AuthContext';
 
 const bannerEmpty = { title: '', imageUrl: '', linkUrl: '', offerId: '', productId: '', orderIndex: 0, isActive: true };
 const offerEmpty = { title: '', description: '', imageUrl: '', merchantId: '', startsAt: '', endsAt: '', orderIndex: 0, isActive: true };
 
 export default function BannersManagement() {
+  const { user } = useAuth();
   const [tab, setTab] = useState('banners');
   const [banners, setBanners] = useState([]);
   const [offers, setOffers] = useState([]);
@@ -129,6 +131,7 @@ export default function BannersManagement() {
         title: offerForm.title.trim(),
         description: offerForm.description || null,
         imageUrl: offerForm.imageUrl,
+        merchantId: offerForm.merchantId || (user?.companyIds?.length === 1 ? user.companyIds[0] : null),
         startsAt: offerForm.startsAt ? new Date(offerForm.startsAt).toISOString() : null,
         endsAt: offerForm.endsAt ? new Date(offerForm.endsAt).toISOString() : null,
         orderIndex: Number(offerForm.orderIndex) || 0,
@@ -157,6 +160,7 @@ export default function BannersManagement() {
       title: o.title || '',
       description: o.description || '',
       imageUrl: o.image_url || '',
+      merchantId: o.merchant_id || '',
       startsAt: o.starts_at ? o.starts_at.slice(0, 10) : '',
       endsAt: o.ends_at ? o.ends_at.slice(0, 10) : '',
       orderIndex: o.order_index ?? 0,

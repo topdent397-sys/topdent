@@ -11,7 +11,7 @@ import {
   assignDriverSchema, companyCreateSchema, companyStatusSchema, companyUpdateSchema, deliveryIssueSchema,
   driverCreateSchema, driverStatusSchema, idParamsSchema, notificationBroadcastSchema, orderStatusSchema,
   platformProductUpdateSchema, platformUserCreateSchema, productStatusSchema, roleAssignmentSchema, roleCreateSchema, rolePermissionsSchema, roleUpdateSchema, userStatusSchema, createCategorySchema, createSubCategorySchema, universitySchema, deliveryRateSchema, deliverySpeedParamsSchema
-  , bannerSchema, updateBannerSchema, createOfferSchema, updateOfferSchema
+  , bannerSchema, updateBannerSchema, createOfferSchema, updateOfferSchema, approvalSchema
 } from '../validation/schemas.js';
 import { validate } from '../middleware/validate.js';
 
@@ -199,6 +199,25 @@ router.patch('/companies/:id/status', requirePermission('companies.disable'), va
   if (error) throw error;
   await audit(req.user.id, 'company_status_updated', 'company', company.id, { isActive: req.body.isActive }, company.id, { is_active: company.is_active }, { is_active: data.is_active }, req.user.roles?.[0]);
   res.json({ message: req.body.isActive ? 'تم تفعيل الشركة' : 'تم تعطيل الشركة ومنع منتجاتها وطلباتها الجديدة', company: data });
+}));
+
+router.patch('/companies/:id/approval', requirePermission('companies.update'), validate({ params: idParamsSchema, body: approvalSchema }), asyncHandler(async (req, res) => {
+  if (!req.user.hasGlobalScope && !req.user.isPlatformOwner) throw new AppError(403, 'اعتماد الشركات متاح لإدارة المنصة فقط', 'PLATFORM_SCOPE_REQUIRED');
+  const company = await findCompany(req.params.id, req.user, 'companies.update');
+  if (!req.body.approved && !req.body.reason) throw new AppError(400, 'أدخل سبب الرفض', 'REJECTION_REASON_REQUIRED');
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseAdmin.from('merchants').update({ is_approved: req.body.approved, is_active: req.body.approved, approval_status: req.body.approved ? 'approved' : 'rejected', rejection_reason: req.body.approved ? null : req.body.reason, approved_by: req.body.approved ? req.user.id : null, approved_at: req.body.approved ? now : null, updated_at: now }).eq('id', company.id).select().single();
+  if (error) throw error;
+  const { error: userError } = await supabaseAdmin.from('users').update({ is_active: req.body.approved, account_status: req.body.approved ? 'active' : 'suspended' }).eq('id', company.user_id);
+  if (userError) throw userError;
+  const { data: role } = await supabaseAdmin.from('roles').select('id').eq('key', 'company_manager').maybeSingle();
+  if (role) {
+    const { error: assignmentError } = await supabaseAdmin.from('user_role_assignments').update({ is_active: req.body.approved, updated_at: now }).eq('user_id', company.user_id).eq('role_id', role.id).eq('company_id', company.id);
+    if (assignmentError) throw assignmentError;
+  }
+  await notify(company.user_id, 'merchant_approval', req.body.approved ? 'تمت الموافقة على شركتك' : 'تم رفض تسجيل الشركة', req.body.approved ? `أصبحت شركة ${company.company_name} جاهزة للعمل.` : req.body.reason);
+  await audit(req.user.id, 'merchant_approval_updated', 'merchant', company.id, req.body, company.id, company, data, req.user.roles?.[0]);
+  res.json({ message: req.body.approved ? 'تمت الموافقة على الشركة' : 'تم رفض الشركة مع تسجيل السبب', company: data });
 }));
 
 router.get('/companies/:id/team', requirePermission('companies.manage_team'), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
@@ -425,6 +444,11 @@ router.get('/orders/:id', requirePermission('orders.view'), validate({ params: i
 router.patch('/orders/:id/status', requireAnyPermission(['orders.review', 'orders.approve', 'orders.reject', 'orders.cancel', 'orders.change_status', 'orders.final_review', 'orders.archive']), validate({ params: idParamsSchema, body: orderStatusSchema }), asyncHandler(async (req, res) => {
   const order = await getOrderWithRelations(req.params.id);
   if (order.merchant_id) assertCompanyScope(req.user, order.merchant_id);
+  if (req.user.roles?.some((role) => ['company_driver', 'platform_driver'].includes(role))) {
+    const { data: driver, error: driverError } = await supabaseAdmin.from('driver_profiles').select('id').eq('user_id', req.user.id).maybeSingle();
+    if (driverError) throw driverError;
+    if (!driver || order.assigned_driver_id !== driver.id) throw new AppError(403, 'فقط السائق المعيّن يمكنه تحديث هذا الطلب', 'DRIVER_ASSIGNMENT_REQUIRED');
+  }
   const updated = await transitionOrder({ order, actor: req.user, toStatus: req.body.status, reason: req.body.reason });
   res.json({ message: 'تم تحديث حالة الطلب', order: updated });
 }));
@@ -673,9 +697,19 @@ router.post('/orders/:id/issues', requireAnyPermission(['orders.confirm_delivery
 
 // --- Banners management (offers / ads carousel) ---
 router.get('/banners', requireAnyPermission(['catalog.view', 'banners.view', 'offers.view']), asyncHandler(async (req, res) => {
-  const { data, error } = await supabaseAdmin.from('banners').select('*, offer:offers(id, title)').order('order_index', { ascending: true });
+  const { data: raw, error } = await supabaseAdmin.from('banners').select('*, offer:offers(id, title)').order('order_index', { ascending: true });
   if (error) throw error;
-  res.json({ banners: data || [] });
+  let data = raw || [];
+  if (!req.user.hasGlobalScope && !req.user.isPlatformOwner) {
+    const [{ data: products }, { data: offers }] = await Promise.all([
+      supabaseAdmin.from('products').select('id').in('merchant_id', req.user.companyIds || []),
+      supabaseAdmin.from('offers').select('id').in('merchant_id', req.user.companyIds || [])
+    ]);
+    const productIds = new Set((products || []).map((item) => item.id));
+    const offerIds = new Set((offers || []).map((item) => item.id));
+    data = data.filter((banner) => (banner.product_id && productIds.has(banner.product_id)) || (banner.offer_id && offerIds.has(banner.offer_id)));
+  }
+  res.json({ banners: data });
 }));
 
 router.post('/banners', requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ body: bannerSchema }), asyncHandler(async (req, res) => {
@@ -732,7 +766,9 @@ router.delete('/banners/:id', requireAnyPermission(['catalog.manage', 'banners.m
 // --- Offers management ---
 router.get('/offers', requireAnyPermission(['catalog.view', 'offers.view']), asyncHandler(async (req, res) => {
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
-  const { data, error, count } = await supabaseAdmin.from('offers').select('*, merchant:merchants(id, company_name)', { count: 'exact' }).order('order_index').range(from, to);
+  let query = supabaseAdmin.from('offers').select('*, merchant:merchants(id, company_name)', { count: 'exact' }).order('order_index');
+  if (!req.user.hasGlobalScope && !req.user.isPlatformOwner) query = query.in('merchant_id', req.user.companyIds || []);
+  const { data, error, count } = await query.range(from, to);
   if (error) throw error;
   res.json({ offers: data || [], pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) } });
 }));
