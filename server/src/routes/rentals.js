@@ -37,7 +37,7 @@ router.post('/requests', verifyToken, requireRole(['customer']), validate({ body
   if (userError) throw userError;
   const { data: request, error: requestError } = await supabaseAdmin.from('rental_requests').insert({
     rental_id: rental.id, user_id: req.user.id, starts_on: req.body.startsOn.toISOString().slice(0, 10), ends_on: req.body.endsOn.toISOString().slice(0, 10),
-    calculated_price: price.total, deposit_snapshot: rental.deposit_amount, status: 'new', customer_snapshot: { ...user, notes: req.body.notes || null }
+    calculated_price: price.total, deposit_snapshot: rental.deposit_amount, status: 'new', customer_snapshot: { ...user, phone: req.body.phone, whatsapp: req.body.whatsapp || null, province: req.body.province, notes: req.body.notes || null }
   }).select().single();
   if (requestError) throw requestError;
   await audit(req.user.id, 'rental_requested', 'rental_request', request.id, { days: price.days });

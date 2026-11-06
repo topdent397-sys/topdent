@@ -71,6 +71,7 @@ export default function ProductDetailsPage() {
   const contactWhatsapp = sellerContact?.whatsapp || product?.merchant?.whatsapp || (isPersonal ? product?.metadata?.sellerWhatsapp : null);
 
   const cleanPhone = (p) => (p || '').replace(/[^0-9+]/g, '');
+  const canUseFavorites = !user || user.role === 'customer';
 
   const share = async () => {
     const url = window.location.href;
@@ -146,9 +147,11 @@ export default function ProductDetailsPage() {
                 </p>
               </div>
               <button
-                onClick={() => toggleFavorite(product.id)}
-                className={`rounded-full p-3 ${isFavorite(product.id) ? 'bg-red-500 text-white' : 'bg-secondary-100 text-secondary-700'}`}
-                aria-label="المفضلة"
+                onClick={() => canUseFavorites && toggleFavorite(product.id)}
+                disabled={!canUseFavorites}
+                className={`rounded-full p-3 ${isFavorite(product.id) ? 'bg-red-500 text-white' : 'bg-secondary-100 text-secondary-700'} disabled:cursor-not-allowed disabled:opacity-40`}
+                aria-label={canUseFavorites ? 'المفضلة' : 'المفضلة متاحة للعملاء فقط'}
+                title={!canUseFavorites ? 'المفضلة متاحة للعملاء فقط' : undefined}
               >
                 <FiHeart className={isFavorite(product.id) ? 'fill-current' : ''} />
               </button>
