@@ -78,6 +78,7 @@ The original schema is preserved in `server/src/db/migrations.sql`. New idempote
 5. `005_personal_sellers.sql` supports customer-owned used-product listings.
 6. `006_rbac_permissions.sql` adds RBAC, company scope, account lifecycle, protected owner assignments, driver types, delivery issues, invoice snapshots, and auditable collection confirmation.
 7. `007_catalog_delivery_controls.sql` adds managed universities, platform fallback delivery rates, catalog permissions, stable product category links, and company delivery controls.
+8. `008_enhanced_products_banners.sql` adds enhanced product metadata, banners, and offer relationships.
 
 Apply migrations using a Supabase service role key:
 
@@ -131,9 +132,10 @@ The client never has a hard-coded production API URL. Set `NEXT_PUBLIC_API_URL` 
 npm run check
 npm test
 npm run build
+npm run check:all
 ```
 
-The test suite verifies health isolation, strict CORS, request validation, mandatory JWT configuration, commerce validation invariants, legacy-safe workflow transitions, role-independent RBAC permission resolution, company-scope isolation, and final-review order behavior. A complete live integration run additionally requires a real Supabase project with the migrations applied.
+The verification suite also runs mobile lint and the production web build. It verifies health isolation, strict CORS, request validation, mandatory JWT configuration, commerce validation invariants, legacy-safe workflow transitions, role-independent RBAC permission resolution, company-scope isolation, and final-review order behavior. A complete live integration run additionally requires a real Supabase project with the migrations applied.
 
 ## Platform management API
 

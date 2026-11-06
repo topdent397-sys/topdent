@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { getCorsOptions, validateRuntimeConfig } from './config/env.js';
@@ -24,6 +25,10 @@ import platformRoutes from './routes/platform.js';
 const PORT = process.env.PORT || 3000;
 const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 500, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'تم تجاوز عدد الطلبات المسموح. حاول لاحقاً.', code: 'RATE_LIMITED' } });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'محاولات كثيرة. انتظر قليلاً قبل المحاولة مجدداً.', code: 'AUTH_RATE_LIMITED' } });
+const publicCatalogCache = (req, res, next) => {
+  if (req.method === 'GET') res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+  next();
+};
 
 export function createApp() {
   validateRuntimeConfig();
@@ -32,6 +37,7 @@ export function createApp() {
   if (process.env.TRUST_PROXY === 'true') app.set('trust proxy', 1);
 
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  app.use(compression({ threshold: 1024 }));
   app.use(cors(getCorsOptions()));
   app.use(express.json({ limit: '2mb' }));
   app.use(express.urlencoded({ limit: '2mb', extended: true }));
@@ -50,8 +56,8 @@ export function createApp() {
 
   app.use('/api', apiLimiter);
   app.use('/api/auth', authLimiter, authRoutes);
-  app.use('/api/catalog', catalogRoutes);
-  app.use('/api/products', productRoutes);
+  app.use('/api/catalog', publicCatalogCache, catalogRoutes);
+  app.use('/api/products', publicCatalogCache, productRoutes);
   app.use('/api/orders', orderRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/merchants', merchantRoutes);
@@ -69,5 +75,14 @@ export function createApp() {
 }
 
 if (process.argv[1] && new URL(import.meta.url).pathname === process.argv[1]) {
-  createApp().listen(PORT, '0.0.0.0', () => console.info(`TopDent API running on port ${PORT}`));
+  const server = createApp().listen(PORT, '0.0.0.0', () => console.info(`TopDent API running on port ${PORT}`));
+  server.requestTimeout = 30_000;
+  server.headersTimeout = 35_000;
+  server.keepAliveTimeout = 5_000;
+  const shutdown = (signal) => {
+    console.info(`Received ${signal}; closing TopDent API gracefully`);
+    server.close((error) => process.exit(error ? 1 : 0));
+  };
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
+  process.once('SIGINT', () => shutdown('SIGINT'));
 }

@@ -17,14 +17,14 @@ function publicUser(user) {
   return { id: user.id, email: user.email, fullName: user.full_name, role: user.role, accountStatus: user.account_status || (user.is_active ? 'active' : 'inactive'), isActive: user.is_active };
 }
 
-async function assignSystemRole({ userId, roleKey, companyId = null }) {
+async function assignSystemRole({ userId, roleKey, companyId = null, isActive = true }) {
   const { data: role, error: roleError } = await supabaseAdmin.from('roles').select('id').eq('key', roleKey).single();
   if (roleError) throw roleError;
   let lookup = supabaseAdmin.from('user_role_assignments').select('id').eq('user_id', userId).eq('role_id', role.id);
   lookup = companyId ? lookup.eq('company_id', companyId) : lookup.is('company_id', null);
   const { data: existing, error: existingError } = await lookup.maybeSingle();
   if (existingError) throw existingError;
-  const payload = { user_id: userId, role_id: role.id, company_id: companyId, scope_type: companyId ? 'company' : 'global', is_active: true, updated_at: new Date().toISOString() };
+  const payload = { user_id: userId, role_id: role.id, company_id: companyId, scope_type: companyId ? 'company' : 'global', is_active: isActive, updated_at: new Date().toISOString() };
   const { error } = existing
     ? await supabaseAdmin.from('user_role_assignments').update(payload).eq('id', existing.id)
     : await supabaseAdmin.from('user_role_assignments').insert(payload);
@@ -44,7 +44,7 @@ async function findExistingAccount(email, phone) {
   if (phoneUser) throw new AppError(409, 'رقم الهاتف مستخدم بالفعل', 'PHONE_IN_USE');
 }
 
-function userInsert(account, passwordHash, role = 'customer') {
+function userInsert(account, passwordHash, role = 'customer', status = {}) {
   return {
     email: account.email,
     password: passwordHash,
@@ -56,7 +56,8 @@ function userInsert(account, passwordHash, role = 'customer') {
     address: account.address || null,
     university_clinic: account.universityClinic || null,
     role,
-    is_active: true,
+    is_active: status.isActive ?? true,
+    account_status: status.accountStatus || 'active',
     terms_accepted_at: new Date().toISOString(),
     privacy_accepted_at: new Date().toISOString(),
     password_changed_at: new Date().toISOString()
@@ -78,7 +79,7 @@ router.post('/register-merchant', validate({ body: merchantRegisterSchema }), as
   const { account, companyName, companyDescription, logoUrl, contactEmail, websiteUrl, contactDetails } = req.body;
   await findExistingAccount(account.email, account.phone);
   const passwordHash = await bcrypt.hash(account.password, 12);
-  const { data: user, error: userError } = await supabaseAdmin.from('users').insert(userInsert(account, passwordHash, 'merchant')).select().single();
+  const { data: user, error: userError } = await supabaseAdmin.from('users').insert(userInsert(account, passwordHash, 'merchant', { isActive: false, accountStatus: 'pending' })).select().single();
   if (userError) throw userError;
 
   const { data: merchant, error: merchantError } = await supabaseAdmin.from('merchants').insert({
@@ -93,7 +94,7 @@ router.post('/register-merchant', validate({ body: merchantRegisterSchema }), as
     contact_email: contactEmail || account.email,
     website_url: websiteUrl || null,
     contact_details: contactDetails,
-    is_active: true,
+    is_active: false,
     is_approved: false,
     approval_status: 'pending'
   }).select().single();
@@ -102,13 +103,13 @@ router.post('/register-merchant', validate({ body: merchantRegisterSchema }), as
     await supabaseAdmin.from('users').delete().eq('id', user.id);
     throw merchantError;
   }
-  await assignSystemRole({ userId: user.id, roleKey: 'company_manager', companyId: merchant.id });
+  await assignSystemRole({ userId: user.id, roleKey: 'company_manager', companyId: merchant.id, isActive: false });
   await audit(user.id, 'merchant_registration_submitted', 'merchant', merchant.id);
   res.status(201).json({
     message: 'تم تسجيل الشركة وهي بانتظار موافقة الإدارة',
     user: publicUser(user),
     merchant: { id: merchant.id, companyName: merchant.company_name, approvalStatus: merchant.approval_status },
-    token: generateToken(user)
+    token: null
   });
 }));
 

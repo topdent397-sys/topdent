@@ -41,9 +41,13 @@ export default function AuthForm({ mode = 'login', role = 'customer' }) {
       const response = isRegister
         ? await api.post(isMerchant ? '/auth/register-merchant' : '/auth/register', isMerchant ? { account: cleanedAccount, ...company, logoUrl: company.logoUrl || null, contactEmail: company.contactEmail || null, websiteUrl: company.websiteUrl || null, companyDescription: company.companyDescription || null } : cleanedAccount)
         : await api.post('/auth/login', { email: account.email, password: account.password });
-      login(response.user, response.token);
       toast.success(response.message || 'تم تسجيل الدخول بنجاح');
-      router.push(search.get('next') || (isMerchant ? '/dashboard' : '/'));
+      if (response.token) {
+        login(response.user, response.token);
+        router.push(search.get('next') || (isMerchant ? '/dashboard' : '/'));
+      } else {
+        router.push('/auth/login');
+      }
     } catch (err) {
       setError(apiError(err));
     } finally { setLoading(false); }

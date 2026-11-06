@@ -47,7 +47,7 @@ export default function Header() {
       <div className="container-main py-3">
         <div className="flex items-center justify-between gap-3">
           <Link href="/" className="flex shrink-0 items-center gap-2" aria-label="الصفحة الرئيسية">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-primary-500 to-primary-800 text-lg font-black text-white shadow-sm" aria-hidden="true"><span className="relative">T<span className="text-primary-200">D</span></span></span>
+            <span className="grid h-10 w-10 place-items-center overflow-hidden rounded-xl bg-primary-50 shadow-sm" aria-hidden="true"><img src="/brand/logo-mark.png" alt="" className="h-10 w-10 object-contain" /></span>
             <span className="hidden text-xl font-black tracking-tight text-secondary-900 sm:block">TopDent</span>
           </Link>
           <div className="hidden max-w-xl flex-1 lg:block"><SearchBar /></div>

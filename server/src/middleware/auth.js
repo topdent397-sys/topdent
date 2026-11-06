@@ -11,12 +11,15 @@ export const verifyToken = async (req, res, next) => {
     const decoded = jwt.verify(token, getJwtSecret());
     const { data: user, error } = await supabaseAdmin
       .from('users')
-      .select('id, email, role, is_active, account_status, full_name')
+      .select('id, email, role, is_active, account_status, full_name, password_changed_at')
       .eq('id', decoded.id)
       .maybeSingle();
     if (error) return next(error);
     if (!user || !user.is_active || user.account_status !== 'active') {
       return res.status(401).json({ error: 'الحساب غير متاح', code: 'ACCOUNT_DISABLED' });
+    }
+    if (user.password_changed_at && decoded.iat && Math.floor(new Date(user.password_changed_at).getTime() / 1000) > decoded.iat) {
+      return res.status(401).json({ error: 'انتهت صلاحية الجلسة بعد تغيير كلمة المرور', code: 'SESSION_REVOKED' });
     }
 
     req.user = await loadUserAccess(user);

@@ -25,6 +25,30 @@ function companyQuery(query, actor) {
   return applyCompanyScope(query, actor, 'id');
 }
 
+async function assertCatalogOwnership(actor, { merchantId = null, productIds = [], productId = null, offerId = null } = {}) {
+  if (actor.hasGlobalScope || actor.isPlatformOwner) return;
+  if (merchantId && !actor.companyIds.includes(merchantId)) throw new AppError(403, 'لا يمكنك إدارة محتوى شركة أخرى', 'COMPANY_SCOPE_FORBIDDEN');
+  const ids = [...new Set([...(productIds || []), ...(productId ? [productId] : [])])];
+  if (ids.length) {
+    const { data, error } = await supabaseAdmin.from('products').select('id, merchant_id').in('id', ids);
+    if (error) throw error;
+    if (!data || data.length !== ids.length || data.some((item) => !actor.companyIds.includes(item.merchant_id))) throw new AppError(403, 'يوجد منتج خارج نطاق شركتك', 'COMPANY_SCOPE_FORBIDDEN');
+  }
+  if (offerId) {
+    const { data, error } = await supabaseAdmin.from('offers').select('id, merchant_id').eq('id', offerId).maybeSingle();
+    if (error) throw error;
+    if (!data || (data.merchant_id && !actor.companyIds.includes(data.merchant_id))) throw new AppError(403, 'العرض خارج نطاق شركتك', 'COMPANY_SCOPE_FORBIDDEN');
+  }
+}
+
+async function assertOfferAccess(actor, id) {
+  const { data, error } = await supabaseAdmin.from('offers').select('id, merchant_id').eq('id', id).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new AppError(404, 'العرض غير موجود', 'OFFER_NOT_FOUND');
+  if (!actor.hasGlobalScope && !actor.isPlatformOwner && data.merchant_id && !actor.companyIds.includes(data.merchant_id)) throw new AppError(403, 'العرض خارج نطاق شركتك', 'COMPANY_SCOPE_FORBIDDEN');
+  return data;
+}
+
 async function saveRoleAssignment(values) {
   let lookup = supabaseAdmin.from('user_role_assignments').select('id').eq('user_id', values.user_id).eq('role_id', values.role_id);
   lookup = values.company_id ? lookup.eq('company_id', values.company_id) : lookup.is('company_id', null);
@@ -655,6 +679,8 @@ router.get('/banners', requireAnyPermission(['catalog.view', 'banners.view', 'of
 }));
 
 router.post('/banners', requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ body: bannerSchema }), asyncHandler(async (req, res) => {
+  await assertCatalogOwnership(req.user, { productId: req.body.productId, offerId: req.body.offerId });
+  if (!req.user.hasGlobalScope && !req.user.isPlatformOwner && !req.body.productId && !req.body.offerId) throw new AppError(403, 'يجب ربط البنر بمحتوى شركتك', 'COMPANY_SCOPE_REQUIRED');
   const { data, error } = await supabaseAdmin.from('banners').insert({
     title: req.body.title || null,
     image_url: req.body.imageUrl,
@@ -670,6 +696,10 @@ router.post('/banners', requireAnyPermission(['catalog.manage', 'banners.manage'
 }));
 
 router.patch('/banners/:id', requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ params: idParamsSchema, body: updateBannerSchema }), asyncHandler(async (req, res) => {
+  const { data: existingBanner, error: existingBannerError } = await supabaseAdmin.from('banners').select('id, product_id, offer_id').eq('id', req.params.id).maybeSingle();
+  if (existingBannerError) throw existingBannerError;
+  if (!existingBanner) throw new AppError(404, 'البنر غير موجود', 'BANNER_NOT_FOUND');
+  await assertCatalogOwnership(req.user, { productId: req.body.productId ?? existingBanner.product_id, offerId: req.body.offerId ?? existingBanner.offer_id });
   const mapping = {
     title: req.body.title,
     image_url: req.body.imageUrl,
@@ -689,6 +719,10 @@ router.patch('/banners/:id', requireAnyPermission(['catalog.manage', 'banners.ma
 }));
 
 router.delete('/banners/:id', requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
+  const { data: banner, error: bannerError } = await supabaseAdmin.from('banners').select('id, product_id, offer_id').eq('id', req.params.id).maybeSingle();
+  if (bannerError) throw bannerError;
+  if (!banner) throw new AppError(404, 'البنر غير موجود', 'BANNER_NOT_FOUND');
+  await assertCatalogOwnership(req.user, { productId: banner.product_id, offerId: banner.offer_id });
   const { data, error } = await supabaseAdmin.from('banners').delete().eq('id', req.params.id).select().single();
   if (error) throw error;
   await audit(req.user.id, 'platform_banner_deleted', 'banner', req.params.id, null, null, data, null, req.user.roles?.[0]);
@@ -705,6 +739,8 @@ router.get('/offers', requireAnyPermission(['catalog.view', 'offers.view']), asy
 
 router.post('/offers', requireAnyPermission(['catalog.manage', 'offers.create']), validate({ body: createOfferSchema }), asyncHandler(async (req, res) => {
   const body = req.body;
+  await assertCatalogOwnership(req.user, { merchantId: body.merchantId, productIds: body.productIds });
+  if (!req.user.hasGlobalScope && !req.user.isPlatformOwner && !body.merchantId) throw new AppError(403, 'حدد شركة ضمن نطاقك للعرض', 'COMPANY_SCOPE_REQUIRED');
   const { data: offer, error } = await supabaseAdmin.from('offers').insert({
     title: body.title,
     description: body.description || null,
@@ -727,6 +763,8 @@ router.post('/offers', requireAnyPermission(['catalog.manage', 'offers.create'])
 
 router.patch('/offers/:id', requireAnyPermission(['catalog.manage', 'offers.create']), validate({ params: idParamsSchema, body: updateOfferSchema }), asyncHandler(async (req, res) => {
   const body = req.body;
+  const existingOffer = await assertOfferAccess(req.user, req.params.id);
+  await assertCatalogOwnership(req.user, { merchantId: body.merchantId ?? existingOffer.merchant_id, productIds: body.productIds });
   const updates = {
     ...(body.title !== undefined ? { title: body.title } : {}),
     ...(body.description !== undefined ? { description: body.description || null } : {}),
@@ -752,6 +790,7 @@ router.patch('/offers/:id', requireAnyPermission(['catalog.manage', 'offers.crea
 }));
 
 router.delete('/offers/:id', requireAnyPermission(['catalog.manage', 'offers.create']), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
+  await assertOfferAccess(req.user, req.params.id);
   const { error } = await supabaseAdmin.from('offers').delete().eq('id', req.params.id);
   if (error) throw error;
   await audit(req.user.id, 'platform_offer_deleted', 'offer', req.params.id);

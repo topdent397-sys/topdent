@@ -100,6 +100,7 @@ router.patch('/merchants/:id/approval', validate({ params: idParamsSchema, body:
   if (!req.body.approved && !req.body.reason) throw new AppError(400, 'أدخل سبب الرفض', 'REJECTION_REASON_REQUIRED');
   const { error: updateError } = await supabaseAdmin.from('merchants').update({
     is_approved: req.body.approved,
+    is_active: req.body.approved,
     approval_status: req.body.approved ? 'approved' : 'rejected',
     rejection_reason: req.body.approved ? null : req.body.reason,
     approved_by: req.body.approved ? req.user.id : null,
@@ -107,6 +108,16 @@ router.patch('/merchants/:id/approval', validate({ params: idParamsSchema, body:
     updated_at: new Date().toISOString()
   }).eq('id', merchant.id);
   if (updateError) throw updateError;
+  const { error: userError } = await supabaseAdmin.from('users').update({
+    is_active: req.body.approved,
+    account_status: req.body.approved ? 'active' : 'suspended'
+  }).eq('id', merchant.user_id);
+  if (userError) throw userError;
+  const { data: managerRole } = await supabaseAdmin.from('roles').select('id').eq('key', 'company_manager').maybeSingle();
+  if (managerRole) {
+    const { error: assignmentError } = await supabaseAdmin.from('user_role_assignments').update({ is_active: req.body.approved, updated_at: new Date().toISOString() }).eq('user_id', merchant.user_id).eq('role_id', managerRole.id).eq('company_id', merchant.id);
+    if (assignmentError) throw assignmentError;
+  }
   await notify(merchant.user_id, 'merchant_approval', req.body.approved ? 'تمت الموافقة على شركتك' : 'تم رفض تسجيل الشركة', req.body.approved ? `أصبحت شركة ${merchant.company_name} جاهزة للعمل.` : req.body.reason);
   await audit(req.user.id, 'merchant_approval_updated', 'merchant', merchant.id, req.body);
   res.json({ message: req.body.approved ? 'تمت الموافقة على الشركة' : 'تم رفض الشركة مع تسجيل السبب' });

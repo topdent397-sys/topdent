@@ -6,15 +6,15 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "topdent",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/logo-mark.png",
     "splash": {
-      "backgroundColor": "#0f766e"
+      "backgroundColor": "#0b3b8f"
     },
     "android": {
       "package": "com.topdent.app",
       "versionCode": 2,
       "adaptiveIcon": {
-        "backgroundColor": "#0f766e"
+        "backgroundColor": "#0b3b8f"
       },
       "permissions": [
         "CAMERA",

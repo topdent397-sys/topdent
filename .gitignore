@@ -35,6 +35,9 @@ uploads/
 *.gif
 *.webp
 !mobile/assets/icon.png
+!client/public/brand/
+!client/public/brand/*.png
+!mobile/assets/logo-mark.png
 mobile/android/
 
 # OS

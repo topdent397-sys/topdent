@@ -20,6 +20,7 @@
     "docker:logs": "docker-compose logs -f",
     "lint": "npm --prefix client run lint",
     "check": "npm --prefix server run check && npm --prefix client run lint",
+    "check:all": "npm run check && npm test && npm --prefix mobile run lint && npm run build:client",
     "test": "npm --prefix server test",
     "migrate": "npm --prefix server run migrate"
   },
