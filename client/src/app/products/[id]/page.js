@@ -97,16 +97,17 @@ export default function ProductDetailsPage() {
 
   if (error) {
     return (
-      <div className="container-main py-20 text-center">
+      <div className="container-main py-20"><div className="empty-state mx-auto max-w-xl">
         <h1 className="text-2xl font-black">{error}</h1>
+        <p className="mt-3 text-secondary-600">تحقق من الرابط أو عد إلى الكتالوج لاختيار منتج آخر.</p>
         <Link href="/products" className="btn-primary mt-6">العودة إلى المنتجات</Link>
-      </div>
+      </div></div>
     );
   }
-  if (!product) return <div className="container-main py-20 text-center text-secondary-600">جارٍ تحميل المنتج...</div>;
+  if (!product) return <div className="min-h-screen bg-secondary-50 py-8"><div className="container-main"><div className="grid gap-8 rounded-3xl bg-white p-5 shadow-card md:grid-cols-2 md:p-8"><div className="skeleton h-[360px] sm:h-[480px]" /><div className="space-y-5"><div className="skeleton h-8 w-2/3" /><div className="skeleton h-5 w-1/3" /><div className="skeleton h-28 w-full" /><div className="skeleton h-14 w-full" /><div className="skeleton h-12 w-full" /></div></div></div></div>;
 
   return (
-    <div className="min-h-screen bg-secondary-50 py-8">
+    <div className="min-h-screen bg-secondary-50 px-0 py-8 pb-24 md:pb-8">
       <div className="container-main">
         <div className="mb-5 text-sm text-secondary-600">
           <Link href="/products" className="hover:text-primary-700">المنتجات</Link>
@@ -313,6 +314,10 @@ export default function ProductDetailsPage() {
             </div>
           </section>
         )}
+      </div>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-secondary-200 bg-white/95 p-3 shadow-2xl backdrop-blur md:hidden">
+        <div className="container-main flex items-center gap-3"><div className="min-w-0 flex-1"><p className="truncate text-xs text-secondary-500">الإجمالي</p><p className="font-black text-primary-700">{formatMoney(product.price * quantity, product.currency)}</p></div><button disabled={soldOut || busyItemId === product.id} onClick={() => addToCart(product.id, quantity)} className="btn-primary flex-1 disabled:bg-secondary-300"><FiShoppingCart className="ml-2" />{soldOut ? 'نفد المخزون' : 'أضف للسلة'}</button></div>
       </div>
 
       {reportOpen && (
