@@ -93,6 +93,7 @@ const productFields = {
   sellerDeclaration: z.boolean().default(false),
   platformFeeAccepted: z.boolean().default(false),
   stockByProvince: z.record(z.coerce.number().int().min(0)).optional().default({}),
+  deliveryCostByProvince: z.record(money).optional().default({}),
   sellerProvinces: z.array(z.string().trim().min(2).max(100)).max(30).optional().default([]),
   metadata: z.record(z.unknown()).optional().default({})
 };

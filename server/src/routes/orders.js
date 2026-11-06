@@ -54,7 +54,12 @@ async function collectCheckoutLines(items) {
   });
 }
 
-async function deliveryQuoteForMerchant(merchant, deliverySpeed, province, provider = 'auto') {
+async function deliveryQuoteForMerchant(merchant, deliverySpeed, province, provider = 'auto', productLines = []) {
+  const customCosts = productLines.map((line) => line.product.delivery_cost_by_province?.[province]).filter((value) => value !== undefined && value !== null && Number.isFinite(Number(value)));
+  if (customCosts.length) {
+    const cost = Math.max(...customCosts.map(Number));
+    return { cost, snapshot: { provider: 'product', providerName: 'تكلفة المنتج المخصصة', speed: deliverySpeed, sameProvince: normalizeArabic(merchant.province) === normalizeArabic(province), merchantProvince: merchant.province, customerProvince: province, cost, capturedAt: nowIso() } };
+  }
   const useMerchant = provider === 'merchant' || (provider === 'auto' && merchant.delivery_enabled !== false);
   const sameProvince = normalizeArabic(merchant.province) === normalizeArabic(province);
   const table = useMerchant ? 'delivery_rates' : 'platform_delivery_rates';
@@ -105,7 +110,7 @@ async function buildQuote({ items, deliverySpeed, province, discountCode, userId
   const merchantQuotes = [];
   for (const group of groups) {
     const provider = group.lines.some((line) => line.product.delivery_provider === 'platform') ? 'platform' : (group.lines.some((line) => line.product.delivery_provider === 'merchant') ? 'merchant' : 'auto');
-    const delivery = await deliveryQuoteForMerchant(group.merchant, deliverySpeed, province, provider);
+    const delivery = await deliveryQuoteForMerchant(group.merchant, deliverySpeed, province, provider, group.lines);
     const subtotal = group.lines.reduce((total, line) => total + line.lineSyp, 0);
     const eligibleSubtotal = discountInfo ? group.lines.filter((line) => discountInfo.eligibleLines.includes(line)).reduce((total, line) => total + line.lineSyp, 0) : 0;
     const discountAmount = discountInfo && eligibleSubtotal ? discountInfo.amount * (eligibleSubtotal / discountInfo.eligibleSubtotal) : 0;

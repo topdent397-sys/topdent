@@ -397,6 +397,7 @@ router.patch('/products/:id', requireAnyPermission(['products.update', 'products
     ...(req.body.deliveryInsideProvince !== undefined ? { delivery_inside_province: req.body.deliveryInsideProvince } : {}),
     ...(req.body.deliveryOutsideProvince !== undefined ? { delivery_outside_province: req.body.deliveryOutsideProvince } : {}),
     ...(req.body.stockByProvince !== undefined ? { stock_by_province: req.body.stockByProvince } : {}),
+    ...(req.body.deliveryCostByProvince !== undefined ? { delivery_cost_by_province: req.body.deliveryCostByProvince } : {}),
     ...(req.body.sellerProvinces !== undefined ? { seller_provinces: req.body.sellerProvinces } : {}),
     updated_at: new Date().toISOString()
   };

@@ -8,7 +8,7 @@ import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { apiError } from '@/lib/format';
 import { ProvinceSelect, UniversitySelect } from '@/components/CatalogSelects';
-import { FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiEye, FiEyeOff, FiMail, FiPhone, FiUser } from 'react-icons/fi';
 
 const initialAccount = { fullName: '', email: '', password: '', passwordConfirmation: '', phone: '', whatsapp: '', province: '', area: '', address: '', universityClinic: '', acceptTerms: false, acceptPrivacy: false };
 
@@ -53,7 +53,7 @@ export default function AuthForm({ mode = 'login', role = 'customer' }) {
     } finally { setLoading(false); }
   };
 
-  const field = (name, label, props = {}) => <label className="block text-sm font-medium text-secondary-800"><span className="mb-1.5 block">{label}{props.required !== false && <span className="text-red-600"> *</span>}</span><input name={name} value={account[name] || ''} onChange={updateAccount} className="input-base" {...props} /></label>;
+  const field = (name, label, props = {}) => { const Icon = name === 'email' ? FiMail : name === 'phone' || name === 'whatsapp' ? FiPhone : name === 'fullName' ? FiUser : null; return <label className="block text-sm font-medium text-secondary-800"><span className="mb-1.5 flex items-center gap-1.5">{Icon && <Icon className="text-primary-600" />}{label}{props.required !== false && <span className="text-red-600"> *</span>}</span><input name={name} value={account[name] || ''} onChange={updateAccount} className="input-base" {...props} /></label>; };
   const passwordField = (name, label, visible, setVisible) => <label className="block text-sm font-medium text-secondary-800"><span className="mb-1.5 block">{label}<span className="text-red-600"> *</span></span><span className="relative block"><input name={name} value={account[name]} onChange={updateAccount} className="input-base pl-11" type={visible ? 'text' : 'password'} minLength={isRegister ? 8 : 1} required /><button type="button" onClick={() => setVisible((value) => !value)} className="absolute left-3 top-1/2 -translate-y-1/2 rounded p-1 text-secondary-500 hover:bg-secondary-100" aria-label={visible ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}>{visible ? <FiEyeOff /> : <FiEye />}</button></span></label>;
 
   return <div className="min-h-screen bg-secondary-50 px-4 py-12"><div className={`mx-auto rounded-2xl bg-white p-6 shadow-card sm:p-9 ${isRegister ? 'max-w-3xl' : 'max-w-md'}`}>

@@ -140,7 +140,7 @@ function Cart({ navigation }) { const [cart, setCart] = useState({ items: [] });
 function Checkout({ navigation }) { const [form, setForm] = useState({ customerName: '', customerPhone: '', province: '', area: '', address: '', deliverySpeed: 'normal', paymentProvider: 'cash' }); const [busy, setBusy] = useState(false); const submit = async () => { setBusy(true); try { const cart = await api.get('/cart'); await api.post('/orders', { ...form, items: cart.items.map((i) => ({ productId: i.product?.id || i.product_id, quantity: i.quantity })), paymentProvider: form.paymentProvider }); Alert.alert('تم الطلب', 'تم إنشاء طلبك بنجاح', [{ text: 'عرض الطلبات', onPress: () => navigation.navigate('Account') }]); } catch (e) { Alert.alert('تعذر إنشاء الطلب', errorText(e)); } finally { setBusy(false); } }; return <ScrollView style={styles.screen}><Header title="إتمام الطلب" subtitle="بيانات التوصيل والدفع" /><Field label="الاسم" value={form.customerName} onChangeText={(v) => setForm({ ...form, customerName: v })} /><Field label="الهاتف" value={form.customerPhone} onChangeText={(v) => setForm({ ...form, customerPhone: v })} keyboardType="phone-pad" /><Field label="المحافظة" value={form.province} onChangeText={(v) => setForm({ ...form, province: v })} /><Field label="المنطقة" value={form.area} onChangeText={(v) => setForm({ ...form, area: v })} /><Field label="العنوان بالتفصيل" value={form.address} onChangeText={(v) => setForm({ ...form, address: v })} multiline /><Text style={styles.label}>سرعة التوصيل</Text><View style={styles.chips}>{['normal', 'urgent', 'very_urgent'].map((v) => <Pressable key={v} onPress={() => setForm({ ...form, deliverySpeed: v })} style={[styles.chip, form.deliverySpeed === v && styles.chipActive]}><Text>{v === 'normal' ? 'عادي' : v === 'urgent' ? 'مستعجل' : 'مستعجل جداً'}</Text></Pressable>)}</View><Button title={busy ? 'جارٍ إنشاء الطلب…' : 'تأكيد الطلب'} onPress={submit} disabled={busy} /></ScrollView>; }
 
 function Sell({ navigation }) {
-  const [form, setForm] = useState({ name: '', nameEn: '', category: '', price: '', stockQuantity: '1', description: '', condition: 'new', deliveryInsideProvince: true, deliveryOutsideProvince: true, sellerName: '', sellerPhone: '', sellerWhatsapp: '', usageDurationMonths: '', defects: '', sellerDeclaration: false, platformFeeAccepted: false, images: [] });
+  const [form, setForm] = useState({ name: '', nameEn: '', category: '', price: '', stockQuantity: '1', description: '', condition: 'new', deliveryInsideProvince: true, deliveryOutsideProvince: true, sellerProvince: '', deliveryCostByProvince: {}, sellerName: '', sellerPhone: '', sellerWhatsapp: '', usageDurationMonths: '', defects: '', sellerDeclaration: false, platformFeeAccepted: false, images: [] });
   const [busy, setBusy] = useState(false);
   const [categories, setCategories] = useState([]);
   const [provinces, setProvinces] = useState([]);
@@ -160,6 +160,11 @@ function Sell({ navigation }) {
     if (Number(val) === 0) delete next[pname];
     setProvinceStock(next);
     setForm((f) => ({ ...f, stockQuantity: String(Object.values(next).reduce((a, b) => a + b, 0)) }));
+  };
+  const onDeliveryCostChange = (pname, val) => {
+    const next = { ...form.deliveryCostByProvince };
+    if (val === '') delete next[pname]; else next[pname] = Math.max(0, Number(val) || 0);
+    setForm((current) => ({ ...current, deliveryCostByProvince: next }));
   };
   const pick = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -197,6 +202,8 @@ function Sell({ navigation }) {
         shippingOtherProvince: form.deliveryOutsideProvince,
         deliveryInsideProvince: form.deliveryInsideProvince,
         deliveryOutsideProvince: form.deliveryOutsideProvince,
+        sellerProvince: form.sellerProvince || undefined,
+        deliveryCostByProvince: form.deliveryCostByProvince,
         usageDurationMonths: form.condition === 'used' ? (form.usageDurationMonths === '' ? 0 : Number(form.usageDurationMonths)) : null,
         defects: form.condition === 'used' ? form.defects || null : null,
         sellerDeclaration: form.sellerDeclaration,
@@ -245,6 +252,12 @@ function Sell({ navigation }) {
       <Pressable onPress={() => setForm({ ...form, deliveryOutsideProvince: !form.deliveryOutsideProvince })} style={styles.check}>
         <Text style={styles.checkText}>{form.deliveryOutsideProvince ? '☑' : '☐'} التوصيل متاح خارج المحافظة</Text>
       </Pressable>
+      <Field label="محافظة البائع" value={form.sellerProvince} onChangeText={(v) => setForm({ ...form, sellerProvince: v })} placeholder="اكتب المحافظة الرئيسية" />
+      <Text style={styles.label}>تكلفة التوصيل حسب المحافظة (اختياري)</Text>
+      <Text style={styles.muted}>اترك الحقول فارغة لاستخدام تعرفة الشركة أو TopDent.</Text>
+      <View style={styles.fieldGrid}>
+        {provinces.map((p) => <View key={`delivery-${p.id}`} style={styles.miniField}><Text style={styles.miniLabel}>{p.name}</Text><TextInput keyboardType="numeric" placeholder="افتراضي" placeholderTextColor={colors.muted} value={form.deliveryCostByProvince[p.name] !== undefined ? String(form.deliveryCostByProvince[p.name]) : ''} onChangeText={(v) => onDeliveryCostChange(p.name, v)} style={styles.miniInput} /></View>)}
+      </View>
 
       <Text style={styles.label}>المخزون حسب المحافظات (في حال وجود فروع)</Text>
       <Pressable onPress={() => setUseProvinceStock(!useProvinceStock)} style={styles.check}>

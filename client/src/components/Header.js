@@ -34,7 +34,8 @@ export default function Header() {
     setUserOpen(false);
     router.push('/');
   };
-  const dashboard = user?.role ? '/dashboard' : '/profile';
+  const dashboardRoles = ['platform_owner', 'platform_admin', 'company_manager', 'company_admin', 'platform_driver', 'company_driver', 'admin', 'manager', 'merchant', 'driver'];
+  const dashboard = user && ((user.roles || []).some((role) => dashboardRoles.includes(role)) || dashboardRoles.includes(user.role)) ? '/dashboard' : '/profile';
 
   return (
     <header className="sticky top-0 z-50 border-b border-secondary-100 bg-white/95 shadow-sm backdrop-blur">
@@ -61,7 +62,7 @@ export default function Header() {
               {userOpen && <div className="absolute left-0 top-full mt-2 w-64 overflow-hidden rounded-xl border border-secondary-100 bg-white shadow-xl">
                 {isAuthenticated ? <>
                   <div className="border-b border-secondary-100 px-4 py-3"><p className="font-bold">{user.fullName || user.email}</p><p className="mt-1 text-xs text-secondary-500">{roleLabels[user.role] || user.role}</p></div>
-                  <Link onClick={() => setUserOpen(false)} href={dashboard} className="block px-4 py-3 hover:bg-secondary-50">لوحة التحكم</Link>
+                  {dashboard === '/dashboard' && <Link onClick={() => setUserOpen(false)} href={dashboard} className="block px-4 py-3 hover:bg-secondary-50">لوحة التحكم</Link>}
                   <Link onClick={() => setUserOpen(false)} href="/profile" className="block px-4 py-3 hover:bg-secondary-50">الملف الشخصي</Link>
                   <button onClick={signOut} className="block w-full px-4 py-3 text-right text-red-600 hover:bg-red-50">تسجيل الخروج</button>
                 </> : <>

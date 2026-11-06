@@ -57,6 +57,7 @@ function productPayload(body, merchant) {
     seller_declaration: body.sellerDeclaration,
     platform_fee_accepted: body.platformFeeAccepted,
     stock_by_province: body.stockByProvince ?? body.stock_by_province ?? {},
+    delivery_cost_by_province: body.deliveryCostByProvince ?? body.delivery_cost_by_province ?? {},
     seller_provinces: body.sellerProvinces ?? body.seller_provinces ?? [],
     metadata: body.metadata || {}
   };
@@ -99,7 +100,7 @@ router.get('/', validate({ query: productQuerySchema }), asyncHandler(async (req
   const { category, subCategory, condition, province, university, minPrice, maxPrice, currency, minUsageMonths, maxUsageMonths, expiresBefore, createdAfter, sortBy, search, offers } = req.query;
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
   let query = supabaseAdmin.from('products').select(`
-    id, name, name_en, condition, price, currency, price_syp, stock_quantity, seller_provinces, stock_by_province, created_at,
+    id, name, name_en, condition, price, currency, price_syp, stock_quantity, seller_provinces, stock_by_province, delivery_cost_by_province, created_at,
     merchant:merchants!inner(id, company_name, logo_url, province, area), images:product_images(image_url, is_primary)
   `, { count: 'exact' }).eq('is_active', true).eq('is_approved', true).eq('status', 'approved');
 
@@ -206,6 +207,7 @@ router.put('/:id', verifyToken, requirePermission('products.update'), validate({
     platformFeeAccepted: req.body.platformFeeAccepted ?? product.platform_fee_accepted,
     nameEn: req.body.nameEn ?? product.name_en,
     stockByProvince: req.body.stockByProvince ?? product.stock_by_province,
+    deliveryCostByProvince: req.body.deliveryCostByProvince ?? product.delivery_cost_by_province,
     sellerProvinces: req.body.sellerProvinces ?? product.seller_provinces,
     deliveryInsideProvince: req.body.deliveryInsideProvince ?? product.delivery_inside_province,
     deliveryOutsideProvince: req.body.deliveryOutsideProvince ?? product.delivery_outside_province,

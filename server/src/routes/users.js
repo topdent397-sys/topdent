@@ -116,6 +116,7 @@ router.post('/listings', requireRole(['customer']), validate({ body: createProdu
     seller_declaration: true,
     platform_fee_accepted: true,
     stock_by_province: req.body.stockByProvince ?? req.body.stock_by_province ?? {},
+    delivery_cost_by_province: req.body.deliveryCostByProvince ?? req.body.delivery_cost_by_province ?? {},
     seller_provinces: req.body.sellerProvinces ?? req.body.seller_provinces ?? [],
     is_active: true,
     is_approved: false,

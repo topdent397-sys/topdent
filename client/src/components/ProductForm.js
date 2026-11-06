@@ -40,6 +40,7 @@ const initial = {
   images: [],
   stockByProvince: {},
   sellerProvinces: [],
+  deliveryCostByProvince: {},
   sellerName: '',
   sellerPhone: '',
   sellerWhatsapp: ''
@@ -64,6 +65,7 @@ export default function ProductForm({
   const [provinces, setProvinces] = useState([]);
   const [useProvinceStock, setUseProvinceStock] = useState(false);
   const [provinceStock, setProvinceStock] = useState({});
+  const [deliveryCosts, setDeliveryCosts] = useState({});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -106,6 +108,14 @@ export default function ProductForm({
     [categories, form.category]
   );
 
+  const onDeliveryCostChange = (provinceName, value) => {
+    const next = { ...deliveryCosts };
+    if (value === '') delete next[provinceName];
+    else next[provinceName] = Math.max(0, Number(value) || 0);
+    setDeliveryCosts(next);
+    setForm((current) => ({ ...current, deliveryCostByProvince: next }));
+  };
+
   const submit = async (event) => {
     event.preventDefault();
     if (form.images.length < 2) return toast.error('أضف صورتين على الأقل للمنتج');
@@ -146,12 +156,14 @@ export default function ProductForm({
         sellerProvinces: useProvinceStock ? Object.keys(provinceStock) : form.sellerProvinces,
         sellerName: form.sellerName || undefined,
         sellerPhone: form.sellerPhone || undefined,
-        sellerWhatsapp: form.sellerWhatsapp || undefined
+        sellerWhatsapp: form.sellerWhatsapp || undefined,
+        deliveryCostByProvince: deliveryCosts
       };
       const response = await api.post(endpoint, payload);
       toast.success(response.message || 'تم إرسال المنتج للمراجعة');
       setForm({ ...initial, ...(condition ? { condition } : {}) });
       setProvinceStock({});
+      setDeliveryCosts({});
       setUseProvinceStock(false);
       onSuccess?.(response);
     } catch (error) {
@@ -369,6 +381,18 @@ export default function ProductForm({
           <p className="mt-3 text-xs text-primary-800">
             إذا لم توفر أنت التوصيل، تتولى TopDent التوصيل وفق التعرفة المعتمدة حسب محافظة الاستلام.
           </p>
+          <div className="mt-5 rounded-xl border border-primary-100 bg-white p-4">
+            <p className="text-sm font-bold text-secondary-900">تكلفة توصيل خاصة بهذا المنتج (اختياري)</p>
+            <p className="mt-1 text-xs leading-6 text-secondary-600">اترك الحقول فارغة لاستخدام تعرفة الشركة أو TopDent. عند إدخال تكلفة لمحافظة، تُستخدم عند اختيار الزبون لها.</p>
+            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {provinces.map((province) => (
+                <label key={province.id} className="text-xs font-bold">
+                  {province.name}
+                  <input type="number" min="0" step="1" value={deliveryCosts[province.name] ?? ''} onChange={(event) => onDeliveryCostChange(province.name, event.target.value)} className="input-base mt-1" placeholder="تعرفة افتراضية" />
+                </label>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
