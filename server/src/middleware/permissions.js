@@ -16,3 +16,8 @@ export const requireAllPermissions = (permissions) => (req, res, next) => {
   if (!canAll(req.user, permissions)) return denied(res, 'ALL_PERMISSIONS_REQUIRED');
   return next();
 };
+
+export const requireGlobalScope = (req, res, next) => {
+  if (!req.user?.hasGlobalScope && !req.user?.isPlatformOwner) return denied(res, 'GLOBAL_SCOPE_REQUIRED');
+  return next();
+};

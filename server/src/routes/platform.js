@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import { supabaseAdmin } from '../config/supabase.js';
 import { verifyToken } from '../middleware/auth.js';
-import { requireAllPermissions, requireAnyPermission, requirePermission } from '../middleware/permissions.js';
+import { requireAllPermissions, requireAnyPermission, requirePermission, requireGlobalScope } from '../middleware/permissions.js';
 import { applyCompanyScope, assertCompanyScope } from '../middleware/scope.js';
 import { asyncHandler, AppError, audit, notify, pageRange } from '../lib/http.js';
 import { assertCanGrantRole, assertAssignableScope, getRoleWithPermissions } from '../services/permissionService.js';
@@ -193,7 +193,7 @@ router.patch('/companies/:id', requirePermission('companies.update'), validate({
   res.json({ message: 'تم تحديث بيانات الشركة', company: data });
 }));
 
-router.patch('/companies/:id/status', requirePermission('companies.disable'), validate({ params: idParamsSchema, body: companyStatusSchema }), asyncHandler(async (req, res) => {
+router.patch('/companies/:id/status', requireGlobalScope, requirePermission('companies.disable'), validate({ params: idParamsSchema, body: companyStatusSchema }), asyncHandler(async (req, res) => {
   const company = await findCompany(req.params.id, req.user, 'companies.disable');
   const { data, error } = await supabaseAdmin.from('merchants').update({ is_active: req.body.isActive, updated_at: new Date().toISOString() }).eq('id', company.id).select().single();
   if (error) throw error;
@@ -293,7 +293,7 @@ router.patch('/users/:id/status', requirePermission('users.disable'), validate({
   res.json({ message: 'تم تحديث حالة الحساب', user: data });
 }));
 
-router.get('/roles', requirePermission('roles.view'), asyncHandler(async (req, res) => {
+router.get('/roles', requireGlobalScope, requirePermission('roles.view'), asyncHandler(async (req, res) => {
   const [{ data: roles, error: rolesError }, { data: permissions, error: permissionsError }] = await Promise.all([
     supabaseAdmin.from('roles').select('*, role_permissions(permission:permissions(id, key, name_ar, module))').order('is_system', { ascending: false }).order('name_ar'),
     supabaseAdmin.from('permissions').select('id, key, name_ar, description, module').order('module').order('name_ar')
@@ -303,7 +303,7 @@ router.get('/roles', requirePermission('roles.view'), asyncHandler(async (req, r
   res.json({ roles: roles || [], permissions: permissions || [] });
 }));
 
-router.post('/roles', requirePermission('roles.create'), validate({ body: roleCreateSchema }), asyncHandler(async (req, res) => {
+router.post('/roles', requireGlobalScope, requirePermission('roles.create'), validate({ body: roleCreateSchema }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('roles').insert({ key: req.body.key, name_ar: req.body.nameAr, description: req.body.description || null, is_system: false, is_active: true }).select().single();
   if (error?.code === '23505') throw new AppError(409, 'مفتاح الدور مستخدم بالفعل', 'ROLE_KEY_EXISTS');
   if (error) throw error;
@@ -311,7 +311,7 @@ router.post('/roles', requirePermission('roles.create'), validate({ body: roleCr
   res.status(201).json({ role: data });
 }));
 
-router.patch('/roles/:id', requirePermission('roles.update'), validate({ params: idParamsSchema, body: roleUpdateSchema }), asyncHandler(async (req, res) => {
+router.patch('/roles/:id', requireGlobalScope, requirePermission('roles.update'), validate({ params: idParamsSchema, body: roleUpdateSchema }), asyncHandler(async (req, res) => {
   const role = await getRoleWithPermissions(req.params.id);
   if (role.key === 'platform_owner') throw new AppError(403, 'دور المدير العام محمي', 'PLATFORM_OWNER_PROTECTED');
   const { data, error } = await supabaseAdmin.from('roles').update({ ...req.body, name_ar: req.body.nameAr, nameAr: undefined, updated_at: new Date().toISOString() }).eq('id', role.id).select().single();
@@ -320,7 +320,7 @@ router.patch('/roles/:id', requirePermission('roles.update'), validate({ params:
   res.json({ role: data });
 }));
 
-router.put('/roles/:id/permissions', requirePermission('roles.assign'), validate({ params: idParamsSchema, body: rolePermissionsSchema }), asyncHandler(async (req, res) => {
+router.put('/roles/:id/permissions', requireGlobalScope, requirePermission('roles.assign'), validate({ params: idParamsSchema, body: rolePermissionsSchema }), asyncHandler(async (req, res) => {
   const role = await getRoleWithPermissions(req.params.id);
   if (role.key === 'platform_owner') throw new AppError(403, 'دور المدير العام محمي', 'PLATFORM_OWNER_PROTECTED');
   const { data: permissions, error: permissionError } = await supabaseAdmin.from('permissions').select('id, key').in('id', req.body.permissionIds);
@@ -560,69 +560,69 @@ router.get('/invoices/:id/export', requirePermission('invoices.export'), validat
 }));
 
 
-router.get('/catalog/categories', requirePermission('catalog.view'), asyncHandler(async (req, res) => {
+router.get('/catalog/categories', requireGlobalScope, requirePermission('catalog.view'), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('categories').select('*, subCategories:sub_categories(*)').order('order_index').order('name');
   if (error) throw error;
   res.json({ categories: data || [] });
 }));
-router.post('/catalog/categories', requirePermission('catalog.manage'), validate({ body: createCategorySchema }), asyncHandler(async (req, res) => {
+router.post('/catalog/categories', requireGlobalScope, requirePermission('catalog.manage'), validate({ body: createCategorySchema }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('categories').insert({ name: req.body.name, description: req.body.description || null, icon_url: req.body.iconUrl || null, order_index: req.body.orderIndex }).select().single();
   if (error?.code === '23505') throw new AppError(409, 'اسم التصنيف مستخدم بالفعل', 'CATEGORY_EXISTS');
   if (error) throw error;
   await audit(req.user.id, 'catalog_category_created', 'category', data.id);
   res.status(201).json({ category: data });
 }));
-router.put('/catalog/categories/:id', requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: createCategorySchema }), asyncHandler(async (req, res) => {
+router.put('/catalog/categories/:id', requireGlobalScope, requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: createCategorySchema }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('categories').update({ name: req.body.name, description: req.body.description || null, icon_url: req.body.iconUrl || null, order_index: req.body.orderIndex }).eq('id', req.params.id).select().maybeSingle();
   if (error) throw error;
   if (!data) throw new AppError(404, 'التصنيف غير موجود', 'CATEGORY_NOT_FOUND');
   await audit(req.user.id, 'catalog_category_updated', 'category', data.id);
   res.json({ category: data });
 }));
-router.patch('/catalog/categories/:id/status', requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: companyStatusSchema.pick({ isActive: true }) }), asyncHandler(async (req, res) => {
+router.patch('/catalog/categories/:id/status', requireGlobalScope, requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: companyStatusSchema.pick({ isActive: true }) }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('categories').update({ is_active: req.body.isActive }).eq('id', req.params.id).select().maybeSingle();
   if (error) throw error;
   if (!data) throw new AppError(404, 'التصنيف غير موجود', 'CATEGORY_NOT_FOUND');
   await audit(req.user.id, 'catalog_category_status_updated', 'category', data.id, { isActive: req.body.isActive });
   res.json({ category: data });
 }));
-router.post('/catalog/sub-categories', requirePermission('catalog.manage'), validate({ body: createSubCategorySchema }), asyncHandler(async (req, res) => {
+router.post('/catalog/sub-categories', requireGlobalScope, requirePermission('catalog.manage'), validate({ body: createSubCategorySchema }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('sub_categories').insert({ category_id: req.body.categoryId, name: req.body.name, description: req.body.description || null }).select().single();
   if (error?.code === '23505') throw new AppError(409, 'اسم التصنيف الفرعي مستخدم بالفعل', 'SUBCATEGORY_EXISTS');
   if (error) throw error;
   await audit(req.user.id, 'catalog_subcategory_created', 'sub_category', data.id);
   res.status(201).json({ subCategory: data });
 }));
-router.put('/catalog/sub-categories/:id', requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: createSubCategorySchema.omit({ categoryId: true }) }), asyncHandler(async (req, res) => {
+router.put('/catalog/sub-categories/:id', requireGlobalScope, requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: createSubCategorySchema.omit({ categoryId: true }) }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('sub_categories').update({ name: req.body.name, description: req.body.description || null }).eq('id', req.params.id).select().maybeSingle();
   if (error) throw error;
   if (!data) throw new AppError(404, 'التصنيف الفرعي غير موجود', 'SUBCATEGORY_NOT_FOUND');
   res.json({ subCategory: data });
 }));
-router.patch('/catalog/sub-categories/:id/status', requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: companyStatusSchema.pick({ isActive: true }) }), asyncHandler(async (req, res) => {
+router.patch('/catalog/sub-categories/:id/status', requireGlobalScope, requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: companyStatusSchema.pick({ isActive: true }) }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('sub_categories').update({ is_active: req.body.isActive }).eq('id', req.params.id).select().maybeSingle();
   if (error) throw error;
   if (!data) throw new AppError(404, 'التصنيف الفرعي غير موجود', 'SUBCATEGORY_NOT_FOUND');
   res.json({ subCategory: data });
 }));
-router.get('/catalog/universities', requirePermission('catalog.view'), asyncHandler(async (req, res) => {
+router.get('/catalog/universities', requireGlobalScope, requirePermission('catalog.view'), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('universities').select('*, province:provinces(id, name)').order('order_index').order('name');
   if (error) throw error;
   res.json({ universities: data || [] });
 }));
-router.post('/catalog/universities', requirePermission('catalog.manage'), validate({ body: universitySchema }), asyncHandler(async (req, res) => {
+router.post('/catalog/universities', requireGlobalScope, requirePermission('catalog.manage'), validate({ body: universitySchema }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('universities').insert({ name: req.body.name, province_id: req.body.provinceId || null, is_active: req.body.isActive, order_index: req.body.orderIndex }).select().single();
   if (error?.code === '23505') throw new AppError(409, 'اسم الجامعة مستخدم في هذه المحافظة', 'UNIVERSITY_EXISTS');
   if (error) throw error;
   res.status(201).json({ university: data });
 }));
-router.patch('/catalog/universities/:id/status', requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: companyStatusSchema.pick({ isActive: true }) }), asyncHandler(async (req, res) => {
+router.patch('/catalog/universities/:id/status', requireGlobalScope, requirePermission('catalog.manage'), validate({ params: idParamsSchema, body: companyStatusSchema.pick({ isActive: true }) }), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('universities').update({ is_active: req.body.isActive, updated_at: new Date().toISOString() }).eq('id', req.params.id).select().maybeSingle();
   if (error) throw error;
   if (!data) throw new AppError(404, 'الجامعة غير موجودة', 'UNIVERSITY_NOT_FOUND');
   res.json({ university: data });
 }));
-router.get('/delivery/platform-rates', requirePermission('catalog.view'), asyncHandler(async (req, res) => {
+router.get('/delivery/platform-rates', requireGlobalScope, requirePermission('catalog.view'), asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('platform_delivery_rates').select('*').order('speed');
   if (error) throw error;
   res.json({ rates: data || [] });

@@ -9,7 +9,9 @@ const bannerEmpty = { title: '', imageUrl: '', linkUrl: '', offerId: '', product
 const offerEmpty = { title: '', description: '', imageUrl: '', merchantId: '', startsAt: '', endsAt: '', orderIndex: 0, isActive: true };
 
 export default function BannersManagement() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
+  const canManageBanners = Boolean(user?.hasGlobalScope || user?.isPlatformOwner || can('banners.manage'));
+  const canManageOffers = Boolean(user?.hasGlobalScope || user?.isPlatformOwner || can('offers.create') || can('offers.update'));
   const [tab, setTab] = useState('banners');
   const [banners, setBanners] = useState([]);
   const [offers, setOffers] = useState([]);
@@ -211,7 +213,7 @@ export default function BannersManagement() {
 
       {tab === 'banners' && (
         <>
-          <section className="rounded-2xl bg-white p-5 shadow-card">
+          {canManageBanners && <section className="rounded-2xl bg-white p-5 shadow-card">
             <h3 className="font-black">{editingBanner ? 'تعديل البنر الإعلاني' : 'إضافة بنر إعلاني جديد'}</h3>
             <p className="mt-1 text-xs text-secondary-500">يظهر البنر في الشريط الإعلاني بالصفحة الرئيسية وينقل المستخدم عند الضغط إليه.</p>
             <form onSubmit={saveBanner} className="mt-4 space-y-4">
@@ -259,7 +261,7 @@ export default function BannersManagement() {
                 </div>
               </div>
             </form>
-          </section>
+          </section>}
 
           <section className="rounded-2xl bg-white p-5 shadow-card">
             <h3 className="font-black">البنرات الحالية</h3>
@@ -278,9 +280,9 @@ export default function BannersManagement() {
                       الترتيب: {b.order_index} · {b.offer?.title ? `مرتبط بالعرض: ${b.offer.title}` : (b.link_url || '—')}
                     </p>
                     <div className="mt-3 flex flex-wrap gap-1">
-                      <button onClick={() => editBanner(b)} className="btn-secondary text-xs">تعديل</button>
+                      {canManageBanners && <><button onClick={() => editBanner(b)} className="btn-secondary text-xs">تعديل</button>
                       <button onClick={() => toggleBanner(b)} className="btn-secondary text-xs">{b.is_active ? 'تعطيل' : 'تفعيل'}</button>
-                      <button onClick={() => deleteBanner(b.id)} className="btn-secondary text-xs text-red-600">حذف</button>
+                      <button onClick={() => deleteBanner(b.id)} className="btn-secondary text-xs text-red-600">حذف</button></>}
                     </div>
                   </div>
                 </div>
@@ -293,7 +295,7 @@ export default function BannersManagement() {
 
       {tab === 'offers' && (
         <>
-          <section className="rounded-2xl bg-white p-5 shadow-card">
+          {canManageOffers && <section className="rounded-2xl bg-white p-5 shadow-card">
             <h3 className="font-black">{editingOffer ? 'تعديل العرض' : 'إضافة عرض جديد'}</h3>
             <p className="mt-1 text-xs text-secondary-500">العروض تظهر في صفحة العروض والخصومات ويمكن ربط أي بنر إعلاني بها.</p>
             <form onSubmit={saveOffer} className="mt-4 space-y-4">
@@ -336,7 +338,7 @@ export default function BannersManagement() {
                 </div>
               </div>
             </form>
-          </section>
+          </section>}
 
           <section className="rounded-2xl bg-white p-5 shadow-card">
             <h3 className="font-black">العروض الحالية</h3>
@@ -353,9 +355,9 @@ export default function BannersManagement() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    <button onClick={() => editOffer(o)} className="btn-secondary text-xs">تعديل</button>
+                    {canManageOffers && <><button onClick={() => editOffer(o)} className="btn-secondary text-xs">تعديل</button>
                     <button onClick={() => toggleOffer(o)} className="btn-secondary text-xs">{o.is_active ? 'تعطيل' : 'تفعيل'}</button>
-                    <button onClick={() => deleteOffer(o.id)} className="btn-secondary text-xs text-red-600">حذف</button>
+                    <button onClick={() => deleteOffer(o.id)} className="btn-secondary text-xs text-red-600">حذف</button></>}
                   </div>
                 </div>
               ))}
