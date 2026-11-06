@@ -1,6 +1,7 @@
 import '@/styles/globals.css';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
+import MobileNav from '@/components/MobileNav';
 import AppProviders from '@/components/AppProviders';
 import { Toaster } from 'react-hot-toast';
 
@@ -21,8 +22,9 @@ export default function RootLayout({ children }) {
       <body className="bg-white">
         <AppProviders>
           <Header />
-          <main className="min-h-screen">{children}</main>
+          <main className="min-h-screen pb-20 lg:pb-0">{children}</main>
           <Footer />
+          <MobileNav />
           <Toaster position="top-center" toastOptions={{ duration: 3500 }} />
         </AppProviders>
       </body>
