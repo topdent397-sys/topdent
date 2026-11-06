@@ -19,8 +19,11 @@ const C = {
 const money = (value, currency = 'SYP') =>
   `${Number(value || 0).toLocaleString('ar-SY')} ${currency === 'USD' ? '$' : 'ل.س'}`;
 
-const imageOf = (p) =>
-  p?.images?.find?.((x) => x.is_primary)?.image_url || p?.images?.[0]?.image_url || p?.image_url;
+const imageOf = (p) => {
+  const source = Array.isArray(p?.images) ? p.images.find((entry) => entry?.is_primary) || p.images[0] : p?.images;
+  if (typeof source === 'string') return source;
+  return source?.image_url || source?.imageUrl || source?.url || p?.image_url || p?.imageUrl || p?.url || null;
+};
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9+]/g, '');
 

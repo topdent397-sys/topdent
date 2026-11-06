@@ -21,7 +21,11 @@ I18nManager.forceRTL(true);
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
 const money = (value) => `${Number(value || 0).toLocaleString('ar-SY')} ل.س`;
-const imageOf = (item) => item?.images?.[0] || item?.image_url || item?.imageUrl || null;
+const imageOf = (item) => {
+  const source = Array.isArray(item?.images) ? item.images.find((entry) => entry?.is_primary) || item.images[0] : item?.images;
+  if (typeof source === 'string') return source;
+  return source?.image_url || source?.imageUrl || source?.url || item?.image_url || item?.imageUrl || item?.url || null;
+};
 
 function Button({ title, onPress, secondary = false, danger = false, disabled = false }) { return <Pressable disabled={disabled} onPress={onPress} style={[styles.button, secondary && styles.buttonSecondary, danger && styles.buttonDanger, disabled && styles.disabled]}><Text style={[styles.buttonText, secondary && styles.buttonSecondaryText]}>{title}</Text></Pressable>; }
 function Field({ label, value, onChangeText, placeholder, secureTextEntry, keyboardType = 'default', multiline = false }) { return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} placeholder={placeholder} placeholderTextColor={colors.muted} secureTextEntry={secureTextEntry} keyboardType={keyboardType} multiline={multiline} style={[styles.input, multiline && styles.textarea]} /></View>; }
