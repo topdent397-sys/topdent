@@ -137,23 +137,43 @@ function Sell({ navigation }) {
     setForm((current) => ({ ...current, deliveryCostByProvince: next }));
   };
   const addPickedImages = (assets = []) => {
+    const selected = (Array.isArray(assets) ? assets : [])
+      .map((asset) => typeof asset === 'string' ? asset : asset?.uri)
+      .filter((uri) => typeof uri === 'string' && uri.length > 0);
+    if (!selected.length) {
+      Alert.alert('لم تتم إضافة صور', 'لم يُرجع منتقي الصور أي ملفات. أعد اختيار الصور من المعرض.');
+      return;
+    }
     const remaining = Math.max(0, 10 - form.images.length);
     if (!remaining) return Alert.alert('الحد الأقصى للصور', 'يمكنك رفع عشر صور كحد أقصى.');
-    const next = assets.map((asset) => asset.uri).filter(Boolean).slice(0, remaining);
+    const next = selected.slice(0, remaining);
     setForm((current) => ({ ...current, images: [...current.images, ...next].slice(0, 10) }));
+    Alert.alert('تمت إضافة الصور', `أُضيفت ${next.length} صورة إلى المنتج. ستظهر معاينتها في النموذج.`);
   };
   const pickGallery = async () => {
     if (form.images.length >= 10) return Alert.alert('الحد الأقصى للصور', 'يمكنك رفع عشر صور كحد أقصى.');
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', 'اسمح للتطبيق بالوصول إلى الصور.');
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 10 - form.images.length, quality: 0.82 });
-    if (!result.canceled) addPickedImages(result.assets);
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', permission.canAskAgain ? 'اسمح للتطبيق بالوصول إلى الصور ثم أعد المحاولة.' : 'فعّل صلاحية الصور للتطبيق من إعدادات الهاتف ثم أعد المحاولة.');
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 10 - form.images.length, quality: 0.82 });
+      if (result?.canceled) return;
+      const assets = Array.isArray(result?.assets) ? result.assets : (result?.uri ? [{ uri: result.uri }] : []);
+      addPickedImages(assets);
+    } catch (error) {
+      Alert.alert('تعذر اختيار الصور', errorText(error, 'حدث خطأ أثناء فتح معرض الصور. حاول مرة أخرى.'));
+    }
   };
   const pickCamera = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', 'اسمح للتطبيق باستخدام الكاميرا لالتقاط صورة للمنتج.');
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.82, allowsEditing: false });
-    if (!result.canceled) addPickedImages(result.assets);
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', 'اسمح للتطبيق باستخدام الكاميرا لالتقاط صورة للمنتج.');
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.82, allowsEditing: false });
+      if (result?.canceled) return;
+      const assets = Array.isArray(result?.assets) ? result.assets : (result?.uri ? [{ uri: result.uri }] : []);
+      addPickedImages(assets);
+    } catch (error) {
+      Alert.alert('تعذر التقاط الصورة', errorText(error, 'حدث خطأ أثناء فتح الكاميرا. حاول مرة أخرى.'));
+    }
   };
   const pick = () => Alert.alert('إضافة صور للمنتج', 'اختر طريقة إضافة الصور', [
     { text: 'التقاط صورة بالكاميرا', onPress: pickCamera },
@@ -330,7 +350,11 @@ const styles = StyleSheet.create({ screen: { flex: 1, backgroundColor: colors.bg
   miniLabel: { fontSize: 11, fontWeight: '800', color: colors.muted },
   miniInput: { width: '100%', textAlign: 'center', fontWeight: '900', color: colors.ink, fontSize: 15, paddingVertical: 2 },
   sellerPanel: { backgroundColor: '#eff6ff', borderRadius: 16, padding: 14, marginVertical: 10, borderWidth: 1, borderColor: '#bfdbfe' },
-  sellerPanelTitle: { color: colors.primary, fontWeight: '900', textAlign: 'right', fontSize: 13, lineHeight: 20, marginBottom: 4 }
+  sellerPanelTitle: { color: colors.primary, fontWeight: '900', textAlign: 'right', fontSize: 13, lineHeight: 20, marginBottom: 4 },
+  imagePreviewList: { flexDirection: 'row-reverse', gap: 10, paddingHorizontal: 2, paddingVertical: 8 },
+  imagePreviewWrap: { width: 112, height: 112, position: 'relative', borderRadius: 14, backgroundColor: '#e2e8f0' },
+  imagePreview: { width: '100%', height: '100%', borderRadius: 14, backgroundColor: '#e2e8f0' },
+  removeImage: { position: 'absolute', top: 3, right: 3, borderRadius: 16, backgroundColor: '#fff', elevation: 3, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 3 }
 });
 
 export default App;
