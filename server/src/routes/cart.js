@@ -1,14 +1,14 @@
 import express from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
-import { verifyToken, requireRole } from '../middleware/auth.js';
+import { verifyToken } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler, AppError, audit } from '../lib/http.js';
 import { addCartItemSchema, itemIdParamsSchema, updateCartItemSchema } from '../validation/schemas.js';
 
 const router = express.Router();
-router.use(verifyToken, requireRole(['customer']));
+router.use(verifyToken);
 
-router.get('/', asyncHandler(async (req, res) => {
+const listCart = asyncHandler(async (req, res) => {
   const { data, error } = await supabaseAdmin.from('cart_items').select(`
     *, product:products(id, name, code, price, price_syp, currency, stock_quantity, is_active, is_approved, status, merchant_id,
       merchant:merchants(company_name, logo_url), images:product_images(image_url, is_primary))
@@ -17,9 +17,9 @@ router.get('/', asyncHandler(async (req, res) => {
   const items = (data || []).map((item) => ({ ...item, available: Boolean(item.product?.is_active && item.product?.is_approved && item.product?.status === 'approved' && item.product.stock_quantity >= item.quantity) }));
   const subtotal = items.reduce((total, item) => total + (item.available ? Number(item.product.price_syp || 0) * item.quantity : 0), 0);
   res.json({ items, subtotal, currency: 'SYP' });
-}));
+});
 
-router.post('/', validate({ body: addCartItemSchema }), asyncHandler(async (req, res) => {
+const addItem = asyncHandler(async (req, res) => {
   const { productId, quantity } = req.body;
   const { data: product, error: productError } = await supabaseAdmin.from('products').select('id, stock_quantity').eq('id', productId).eq('is_active', true).eq('is_approved', true).eq('status', 'approved').maybeSingle();
   if (productError) throw productError;
@@ -35,7 +35,12 @@ router.post('/', validate({ body: addCartItemSchema }), asyncHandler(async (req,
   if (error) throw error;
   await audit(req.user.id, 'cart_item_added', 'product', productId, { quantity });
   res.status(201).json({ message: 'تمت إضافة المنتج إلى السلة' });
-}));
+});
+
+router.get('/', listCart);
+router.get('/items', listCart);
+router.post('/', validate({ body: addCartItemSchema }), addItem);
+router.post('/items', validate({ body: addCartItemSchema }), addItem);
 
 router.patch('/:itemId', validate({ params: itemIdParamsSchema, body: updateCartItemSchema }), asyncHandler(async (req, res) => {
   const { data: item, error } = await supabaseAdmin.from('cart_items').select('id, product:products(stock_quantity, is_active, is_approved, status)').eq('id', req.params.itemId).eq('user_id', req.user.id).maybeSingle();

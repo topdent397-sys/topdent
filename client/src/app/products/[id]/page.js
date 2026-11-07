@@ -71,7 +71,7 @@ export default function ProductDetailsPage() {
   const contactWhatsapp = sellerContact?.whatsapp || product?.merchant?.whatsapp || (isPersonal ? product?.metadata?.sellerWhatsapp : null);
 
   const cleanPhone = (p) => (p || '').replace(/[^0-9+]/g, '');
-  const canUseFavorites = !user || user.role === 'customer';
+  const canUseFavorites = true;
 
   const share = async () => {
     const url = window.location.href;
@@ -86,10 +86,15 @@ export default function ProductDetailsPage() {
 
   const sendReport = async (event) => {
     event.preventDefault();
+    if (!user) {
+      toast.error('سجّل الدخول أولاً لإرسال بلاغ عن المنتج');
+      return;
+    }
     try {
-      await api.post(`/products/${product.id}/report`, report);
+      await api.post(`/products/${product.id}/report`, { reason: report.reason.trim(), details: report.details?.trim() || null });
       toast.success('تم إرسال البلاغ للمراجعة');
       setReportOpen(false);
+      setReport({ reason: '', details: '' });
     } catch (err) {
       toast.error(apiError(err));
     }
@@ -149,10 +154,8 @@ export default function ProductDetailsPage() {
               </div>
               <button
                 onClick={() => canUseFavorites && toggleFavorite(product.id)}
-                disabled={!canUseFavorites}
-                className={`rounded-full p-3 ${isFavorite(product.id) ? 'bg-red-500 text-white' : 'bg-secondary-100 text-secondary-700'} disabled:cursor-not-allowed disabled:opacity-40`}
-                aria-label={canUseFavorites ? 'المفضلة' : 'المفضلة متاحة للعملاء فقط'}
-                title={!canUseFavorites ? 'المفضلة متاحة للعملاء فقط' : undefined}
+                className={`rounded-full p-3 transition ${isFavorite(product.id) ? 'bg-red-500 text-white' : 'bg-secondary-100 text-secondary-700 hover:bg-secondary-200'}`}
+                aria-label="المفضلة"
               >
                 <FiHeart className={isFavorite(product.id) ? 'fill-current' : ''} />
               </button>
@@ -327,7 +330,7 @@ export default function ProductDetailsPage() {
             <p className="mt-2 text-sm text-secondary-600">يراجع فريق الإدارة البلاغ دون نشر بياناتك.</p>
             <input
               required
-              minLength="3"
+              minLength="2"
               value={report.reason}
               onChange={(e) => setReport((c) => ({ ...c, reason: e.target.value }))}
               placeholder="سبب البلاغ"

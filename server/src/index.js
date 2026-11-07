@@ -19,14 +19,13 @@ import favoriteRoutes from './routes/favorites.js';
 import deliveryRateRoutes from './routes/deliveryRates.js';
 import catalogRoutes from './routes/catalog.js';
 import rentalRoutes from './routes/rentals.js';
-import dentalCardRoutes from './routes/dentalCards.js';
 import platformRoutes from './routes/platform.js';
 
 const PORT = process.env.PORT || 3000;
 const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 500, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'تم تجاوز عدد الطلبات المسموح. حاول لاحقاً.', code: 'RATE_LIMITED' } });
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'محاولات كثيرة. انتظر قليلاً قبل المحاولة مجدداً.', code: 'AUTH_RATE_LIMITED' } });
 const publicCatalogCache = (req, res, next) => {
-  if (req.method === 'GET') res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
+  if (req.method === 'GET') res.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
   next();
 };
 
@@ -67,7 +66,6 @@ export function createApp() {
   app.use('/api/delivery-rates', deliveryRateRoutes);
   app.use('/api/upload', uploadRoutes);
   app.use('/api/rentals', rentalRoutes);
-  app.use('/api/dental-cards', dentalCardRoutes);
   app.use('/api/platform', platformRoutes);
   app.use('/api', notFound);
   app.use(errorMiddleware);

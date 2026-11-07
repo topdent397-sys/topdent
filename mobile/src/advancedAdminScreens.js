@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api, { errorText } from './api';
@@ -14,8 +14,9 @@ const money = (v, c = 'SYP') => `${Number(v || 0).toLocaleString('ar-SY')} ${c =
 export function AdvancedAdminScreen() {
   const [active, setActive] = useState('offers'); const [form, setForm] = useState(empty); const [data, setData] = useState({}); const [busy, setBusy] = useState(false); const set = (k, v) => setForm((x) => ({ ...x, [k]: v }));
   const endpoints = { offers: '/admin/offers', discounts: '/admin/discounts', banners: '/admin/banners', delivery: '/platform/delivery/platform-rates', collections: '/platform/collections', rentals: '/rentals/admin/requests' };
-  const load = async () => { try { const r = await api.get(endpoints[active]); setData(r); } catch (e) { setData({ error: errorText(e) }); } };
-  useFocusEffect(React.useCallback(() => { load(); }, [active]));
+  const endpoint = endpoints[active];
+  const load = useCallback(async () => { try { const r = await api.get(endpoint); setData(r); } catch (e) { setData({ error: errorText(e) }); } }, [endpoint]);
+  useFocusEffect(React.useCallback(() => { load(); }, [load]));
   const save = async () => { setBusy(true); try { if (active === 'offers') await api.post('/admin/offers', { title: form.title, description: form.description || null, imageUrl: form.imageUrl, merchantId: null, productIds: [], orderIndex: 0, isActive: true }); if (active === 'discounts') await api.post('/admin/discounts', { code: form.code, discountPercentage: form.discountPercentage ? Number(form.discountPercentage) : undefined, discountAmount: form.discountAmount ? Number(form.discountAmount) : undefined, minOrderAmount: Number(form.minOrderAmount || 0), productIds: [] }); if (active === 'banners') await api.post('/admin/banners', { title: form.title || null, imageUrl: form.imageUrl, linkUrl: form.linkUrl || null, orderIndex: 0, isActive: true }); Alert.alert('تم الحفظ', 'تمت إضافة العنصر بنجاح'); setForm(empty); load(); } catch (e) { Alert.alert('تعذر التنفيذ', errorText(e)); } finally { setBusy(false); } };
   const saveRate = async () => { setBusy(true); try { await api.put(`/platform/delivery/platform-rates/${form.speed}`, { sameProvince: Number(form.sameProvince || 0), otherProvince: Number(form.otherProvince || 0) }); Alert.alert('تم الحفظ', 'تم تحديث تعرفة التوصيل'); setForm(empty); load(); } catch (e) { Alert.alert('تعذر الحفظ', errorText(e)); } finally { setBusy(false); } };
   const updateRental = async (id) => { setBusy(true); try { await api.patch(`/rentals/admin/requests/${id}`, { status: form.status, managerNote: form.managerNote || undefined, returnCondition: form.returnCondition || undefined }); Alert.alert('تم التحديث', 'تم تحديث طلب الإيجار'); load(); } catch (e) { Alert.alert('تعذر التحديث', errorText(e)); } finally { setBusy(false); } };

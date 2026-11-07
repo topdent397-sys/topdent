@@ -12,7 +12,7 @@ import { roleLabels } from '@/lib/format';
 
 const primaryLinks = [
   ['المنتجات', '/products'], ['جديد', '/products?condition=new'], ['مستعمل', '/products?condition=used'],
-  ['اعرض منتجك', '/sell'], ['الإيجار', '/rentals'], ['تصميم كرت طبيب', '/dental-card'], ['العروض', '/offers']
+  ['اعرض منتجك', '/sell'], ['الإيجار', '/rentals'], ['العروض', '/offers']
 ];
 
 export default function Header() {

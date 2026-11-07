@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api, { errorText } from './api';
+import { Ionicons } from '@expo/vector-icons';
 
 const C = {
   primary: '#2563eb',
@@ -27,12 +28,12 @@ const imageOf = (p) => {
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9+]/g, '');
 
-function Btn({ title, onPress, secondary = false, disabled = false, danger = false, small = false }) {
+function Btn({ title, onPress, secondary = false, disabled = false, danger = false, small = false, active = false }) {
   return (
     <Pressable
       disabled={disabled}
       onPress={onPress}
-      style={[s.btn, secondary && s.secondary, danger && s.danger, small && s.btnSmall, disabled && s.disabled]}
+      style={[s.btn, secondary && s.secondary, active && s.chipActive, danger && s.danger, small && s.btnSmall, disabled && s.disabled]}
     >
       <Text style={[s.btnText, secondary && s.secondaryText, danger && s.dangerText, small && s.btnSmallText]}>
         {title}
@@ -89,7 +90,7 @@ export function CommerceProducts({ navigation }) {
   const [form, setForm] = useState({ search: '', category: '', condition: '', currency: '', sortBy: 'newest', page: 1 });
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const q = new URLSearchParams(Object.entries(form).filter(([, v]) => v));
@@ -100,16 +101,16 @@ export function CommerceProducts({ navigation }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [form]);
 
   useEffect(() => {
     api.get('/catalog/categories').then((r) => setCategories(r.categories || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(load, 250);
+    const t = setTimeout(() => load(), 250);
     return () => clearTimeout(t);
-  }, [form.search, form.category, form.condition, form.currency, form.sortBy, form.page]);
+  }, [load]);
 
   return (
     <View style={s.screen}>
@@ -135,9 +136,9 @@ export function CommerceProducts({ navigation }) {
           ))}
         </View>
         <View style={s.sortRow}>
-          <Btn title="الأحدث" secondary onPress={() => setForm({ ...form, sortBy: 'newest' })} />
-          <Btn title="الأرخص" secondary onPress={() => setForm({ ...form, sortBy: 'price_asc' })} />
-          <Btn title="الأغلى" secondary onPress={() => setForm({ ...form, sortBy: 'price_desc' })} />
+          <Btn title="الأحدث" secondary active={form.sortBy === 'newest'} onPress={() => setForm({ ...form, sortBy: 'newest', page: 1 })} />
+          <Btn title="الأرخص" secondary active={form.sortBy === 'price_asc'} onPress={() => setForm({ ...form, sortBy: 'price_asc', page: 1 })} />
+          <Btn title="الأغلى" secondary active={form.sortBy === 'price_desc'} onPress={() => setForm({ ...form, sortBy: 'price_desc', page: 1 })} />
         </View>
         {loading ? (
           <Text style={s.muted}>جارٍ تحميل الكتالوج...</Text>
@@ -172,6 +173,7 @@ export function CommerceProduct({ route, navigation }) {
       setProduct(p);
       setRelated(r.products || []);
       setProvinces(prov.provinces || []);
+      api.get('/favorites').then((result) => setFavorite((result.favorites || []).some((item) => item.product?.id === p.id))).catch(() => setFavorite(false));
     }).catch(() => {});
   }, [route.params.id]);
 
@@ -180,6 +182,7 @@ export function CommerceProduct({ route, navigation }) {
     : null;
   const hasProvinceStock = stockByProvince && Object.keys(stockByProvince).length > 0;
   const selectedProvinceStock = viewerProvince && hasProvinceStock ? stockByProvince[viewerProvince] : null;
+  const maxAvailable = hasProvinceStock && viewerProvince ? Number(selectedProvinceStock || 0) : Number(product?.stock_quantity || 0);
 
   const add = async () => {
     setBusy(true);
@@ -204,8 +207,9 @@ export function CommerceProduct({ route, navigation }) {
   };
 
   const sendReport = async () => {
+    if (report.trim().length < 2) return Alert.alert('سبب مطلوب', 'اكتب سبباً واضحاً للبلاغ.');
     try {
-      await api.post(`/products/${product.id}/report`, { reason: report });
+      await api.post(`/products/${product.id}/report`, { reason: report.trim() });
       setReport('');
       Alert.alert('تم البلاغ', 'تم إرسال البلاغ لفريق المراجعة');
     } catch (e) {
@@ -296,12 +300,14 @@ export function CommerceProduct({ route, navigation }) {
       ) : null}
 
       <View style={s.actions}>
-        <Btn title={favorite ? 'إزالة من المفضلة' : 'أضف للمفضلة'} secondary onPress={toggleFavorite} />
+        <Pressable accessibilityRole="button" accessibilityLabel={favorite ? 'إزالة من المفضلة' : 'أضف للمفضلة'} onPress={toggleFavorite} style={s.favoriteButton}>
+          <Ionicons name={favorite ? 'heart' : 'heart-outline'} size={22} color={favorite ? '#dc2626' : C.primary} />
+        </Pressable>
         <Btn title="−" secondary onPress={() => setQty(Math.max(1, qty - 1))} />
         <Text style={s.qty}>{qty}</Text>
-        <Btn title="＋" secondary onPress={() => setQty(qty + 1)} />
+        <Btn title="＋" secondary disabled={qty >= maxAvailable} onPress={() => setQty((current) => Math.min(maxAvailable, current + 1))} />
       </View>
-      <Btn title={busy ? 'جارٍ الإضافة...' : 'أضف إلى السلة'} onPress={add} disabled={busy || !product.stock_quantity} />
+      <Btn title={busy ? 'جارٍ الإضافة...' : 'أضف إلى السلة'} onPress={add} disabled={busy || maxAvailable < 1} />
 
       <Text style={s.section}>إبلاغ عن المنتج</Text>
       <Field label="سبب البلاغ" value={report} onChangeText={setReport} multiline placeholder="اكتب سبب البلاغ" />
@@ -578,6 +584,7 @@ const s = StyleSheet.create({
   heroPlaceholder: { height: 220, borderRadius: 18, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center', marginVertical: 14 },
   info: { backgroundColor: '#fff', borderRadius: 14, padding: 14, gap: 8, marginTop: 14 },
   actions: { flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  favoriteButton: { minWidth: 44, height: 44, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   btn: { backgroundColor: C.primary, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginTop: 10, alignItems: 'center' },
   btnSmall: { paddingHorizontal: 10, paddingVertical: 8 },
   secondary: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.primary },

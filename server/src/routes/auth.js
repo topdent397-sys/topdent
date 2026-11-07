@@ -9,6 +9,7 @@ import { validate } from '../middleware/validate.js';
 import { asyncHandler, AppError, audit } from '../lib/http.js';
 import { sendPasswordResetEmail } from '../lib/mail.js';
 import { changePasswordSchema, forgotPasswordSchema, loginSchema, merchantRegisterSchema, registerSchema, resetPasswordSchema } from '../validation/schemas.js';
+import { loadUserAccess } from '../services/permissionService.js';
 
 const router = express.Router();
 const tokenExpiry = process.env.JWT_EXPIRES_IN || '7d';
@@ -72,7 +73,8 @@ router.post('/register', validate({ body: registerSchema }), asyncHandler(async 
   if (error) throw error;
   await assignSystemRole({ userId: user.id, roleKey: 'customer' });
   await audit(user.id, 'customer_registered', 'user', user.id);
-  res.status(201).json({ message: 'تم إنشاء الحساب بنجاح', user: publicUser(user), token: generateToken(user) });
+  const fullUser = await loadUserAccess(user);
+  res.status(201).json({ message: 'تم إنشاء الحساب بنجاح', user: fullUser, token: generateToken(user) });
 }));
 
 router.post('/register-merchant', validate({ body: merchantRegisterSchema }), asyncHandler(async (req, res) => {
@@ -122,7 +124,8 @@ router.post('/login', validate({ body: loginSchema }), asyncHandler(async (req, 
 
   await supabaseAdmin.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', user.id);
   await audit(user.id, 'login_succeeded', 'user', user.id);
-  res.json({ message: 'تم تسجيل الدخول بنجاح', user: publicUser(user), token: generateToken(user) });
+  const fullUser = await loadUserAccess(user);
+  res.json({ message: 'تم تسجيل الدخول بنجاح', user: fullUser, token: generateToken(user) });
 }));
 
 router.post('/forgot-password', validate({ body: forgotPasswordSchema }), asyncHandler(async (req, res) => {

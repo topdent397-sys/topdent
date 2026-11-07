@@ -18,8 +18,8 @@ async function persistImage(file, ownerId) {
   if (!detected || !acceptedTypes.has(detected.mime)) throw new AppError(400, 'يُسمح بصور JPEG وPNG وWebP فقط', 'INVALID_IMAGE_TYPE');
   const transformed = await sharp(file.buffer, { limitInputPixels: 25_000_000 })
     .rotate()
-    .resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 82 })
+    .resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 78, effort: 4 })
     .toBuffer({ resolveWithObject: true });
   const key = `users/${ownerId}/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.webp`;
   await ensureMediaBucket();

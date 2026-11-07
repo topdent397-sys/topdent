@@ -71,9 +71,17 @@ export function canAll(actor, permissions) {
 
 export function hasCompatibleLegacyRole(actor, expectedRoles) {
   if (!actor) return false;
-  // Legacy routes preserve the original primary-role behavior only. New RBAC
-  // assignments must use permission-protected routes and cannot inherit old APIs.
-  return expectedRoles.includes(actor.role);
+  if (actor.isPlatformOwner) return true;
+  if (expectedRoles.includes(actor.role)) return true;
+  const roles = Array.isArray(actor.roles) ? actor.roles : [];
+  const roleAliases = {
+    admin: ['platform_admin', 'legacy_platform_operator'],
+    manager: ['company_manager', 'company_admin'],
+    merchant: ['company_manager', 'company_admin'],
+    driver: ['platform_driver', 'company_driver']
+  };
+  return roles.some((role) => expectedRoles.includes(role)
+    || expectedRoles.some((expectedRole) => roleAliases[expectedRole]?.includes(role)));
 }
 
 export function canAccessCompany(actor, companyId) {

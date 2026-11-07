@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const trimmedString = (min, max) => z.string().trim().min(min).max(max);
-const optionalText = (max) => z.string().trim().max(max).optional().nullable();
+const optionalText = (max) => z.union([z.string().trim().max(max), z.literal(''), z.null()]).optional().transform((v) => (v === undefined ? undefined : (v && v.length ? v : null)));
 const optionalUrl = z.string().trim().url().max(500).optional().nullable();
 const phone = z.string().trim().regex(/^[+0-9()\-\s]{6,25}$/, 'رقم الهاتف غير صالح');
 const uuid = z.string().uuid('المعرف غير صالح');
@@ -122,7 +122,7 @@ export const productQuerySchema = z.object({
   maxUsageMonths: z.coerce.number().int().min(0).optional(),
   expiresBefore: date.optional(),
   createdAfter: date.optional(),
-  sortBy: z.enum(['newest', 'oldest', 'cheapest', 'expensive']).default('newest'),
+  sortBy: z.enum(['newest', 'oldest', 'cheapest', 'expensive', 'price_asc', 'price_desc']).default('newest'),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: trimmedString(1, 200).optional(),
@@ -213,8 +213,14 @@ export const createDiscountSchema = z.object({
 });
 const offerFields = { title: trimmedString(2, 255), description: optionalText(5000), imageUrl: imagePath, merchantId: uuid.optional().nullable(), productIds: z.array(uuid).max(100).default([]), startsAt: date.optional().nullable(), endsAt: date.optional().nullable(), orderIndex: z.coerce.number().int().min(0).max(10000).default(0), isActive: z.boolean().default(true) };
 export const createOfferSchema = z.object(offerFields).strict().refine((value) => !value.startsAt || !value.endsAt || value.endsAt > value.startsAt, { path: ['endsAt'], message: 'تاريخ النهاية يجب أن يكون بعد البداية' });
-export const reportProductSchema = z.object({ reason: trimmedString(3, 100), details: optionalText(2000) }).strict();
-export const rentalRequestSchema = z.object({ rentalId: uuid, startsOn: date, endsOn: date, phone, whatsapp: phone.optional().or(z.literal('')).transform((value) => value || undefined), province: trimmedString(2, 100), notes: optionalText(2000) }).strict().refine((value) => value.endsOn >= value.startsOn, { path: ['endsOn'], message: 'تاريخ النهاية يجب أن يكون بعد البداية' });
+export const reportProductSchema = z.object({ reason: trimmedString(2, 200), details: optionalText(2000) }).strict();
+export const rentalRequestSchema = z.preprocess((val) => {
+  if (val && typeof val === 'object') {
+    const { startDate, endDate, ...rest } = val;
+    return { ...rest, startsOn: val.startsOn ?? startDate, endsOn: val.endsOn ?? endDate };
+  }
+  return val;
+}, z.object({ rentalId: uuid, startsOn: date, endsOn: date, phone, whatsapp: phone.optional().or(z.literal('')).transform((value) => value || undefined), province: trimmedString(2, 100), notes: optionalText(2000) }).strict().refine((value) => value.endsOn >= value.startsOn, { path: ['endsOn'], message: 'تاريخ النهاية يجب أن يكون بعد البداية' }));
 export const createRentalSchema = z.object({ productId: uuid, dailyPrice: positiveMoney.optional().nullable(), weeklyPrice: positiveMoney.optional().nullable(), depositAmount: money.default(0), returnTerms: trimmedString(5, 5000), lateFeePerDay: money.default(0), isActive: z.boolean().default(true) }).strict().refine((value) => value.dailyPrice || value.weeklyPrice, { message: 'حدد سعر اليوم أو الأسبوع' });
 export const dentalCardRequestSchema = z.object({ doctorName: trimmedString(3, 255), specialty: optionalText(255), phone, address: optionalText(500), email: z.string().trim().email().max(255).optional().nullable(), logoUrl: imagePath.optional().nullable(), colors: optionalText(255), requestedText: optionalText(5000), requestedTemplate: optionalText(100), attachments: z.array(imagePath).max(10).default([]) }).strict();
 export const dentalCardQuoteSchema = z.object({ quotedPrice: positiveMoney, executionDays: z.coerce.number().int().min(1).max(365), includedRevisions: z.coerce.number().int().min(0).max(50).default(0), status: z.enum(['quoted', 'in_progress', 'revision', 'completed', 'cancelled']), adminNote: optionalText(5000) }).strict();

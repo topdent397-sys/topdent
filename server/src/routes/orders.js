@@ -265,7 +265,7 @@ router.post('/', verifyToken, requireRole(['customer']), validate({ body: create
   }
 }));
 
-router.get('/customer/my-orders', verifyToken, requireRole(['customer']), asyncHandler(async (req, res) => {
+router.get('/customer/my-orders', verifyToken, asyncHandler(async (req, res) => {
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
   let query = supabaseAdmin.from('orders').select('*, children:orders!parent_order_id(id, order_number, merchant_id, status, payment_status, total, currency, merchant:merchants(company_name))', { count: 'exact' }).eq('user_id', req.user.id).eq('order_type', 'parent');
   if (req.query.status) query = query.eq('status', req.query.status);
@@ -378,6 +378,8 @@ router.post('/:id/driver/cash-collected', verifyToken, requirePermission('orders
 
 router.post('/:id/receipt', verifyToken, requireRole(['manager', 'admin']), validate({ params: idParamsSchema, body: moneyReceiptSchema }), asyncHandler(async (req, res) => {
   const order = await getOrderWithRelations(req.params.id);
+  if (order.order_type !== 'merchant') throw new AppError(400, 'يجب تسجيل الإيصال على طلب شركة فرعي', 'PARENT_ORDER_NOT_RECEIVABLE');
+  if (!req.user.hasGlobalScope) assertCompanyScope(req.user, order.merchant_id);
   const updated = await transitionOrder({ order, actor: req.user, toStatus: 'payment_received', reason: req.body.notes, extra: { payment_status: 'received' } });
   const { error } = await supabaseAdmin.from('money_receipts').insert({ order_id: order.id, received_by: req.user.id, recipient_name: req.body.recipientName, amount: req.body.amount, currency: req.body.currency, notes: req.body.notes || null, proof_url: req.body.proofUrl || null });
   if (error) throw error;

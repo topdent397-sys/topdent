@@ -6,10 +6,12 @@ import { asyncHandler, AppError, audit, merchantForUser, pageRange } from '../li
 import { merchantProfileSchema } from '../validation/schemas.js';
 
 const router = express.Router();
-router.use(verifyToken, requireRole(['merchant']));
+router.use(verifyToken, requireRole(['merchant', 'company_manager', 'company_admin', 'admin', 'manager']));
+
+const resolveMerchant = (req) => merchantForUser(req.user.id, req.user.companyIds?.[0]);
 
 router.get('/dashboard', asyncHandler(async (req, res) => {
-  const merchant = await merchantForUser(req.user.id);
+  const merchant = await resolveMerchant(req);
   if (!merchant) throw new AppError(404, 'ملف الشركة غير موجود', 'MERCHANT_NOT_FOUND');
   const [{ data: products, error: productsError }, { data: orders, error: ordersError }] = await Promise.all([
     supabaseAdmin.from('products').select('id, status, stock_quantity').eq('merchant_id', merchant.id),
@@ -33,7 +35,7 @@ router.get('/dashboard', asyncHandler(async (req, res) => {
 }));
 
 router.get('/products', asyncHandler(async (req, res) => {
-  const merchant = await merchantForUser(req.user.id);
+  const merchant = await resolveMerchant(req);
   if (!merchant) throw new AppError(404, 'ملف الشركة غير موجود', 'MERCHANT_NOT_FOUND');
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
   let query = supabaseAdmin.from('products').select('*, images:product_images(image_url, is_primary)', { count: 'exact' }).eq('merchant_id', merchant.id);
@@ -44,7 +46,7 @@ router.get('/products', asyncHandler(async (req, res) => {
 }));
 
 router.get('/orders', asyncHandler(async (req, res) => {
-  const merchant = await merchantForUser(req.user.id);
+  const merchant = await resolveMerchant(req);
   if (!merchant) throw new AppError(404, 'ملف الشركة غير موجود', 'MERCHANT_NOT_FOUND');
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
   let query = supabaseAdmin.from('orders').select('*, items:order_items(*), customer:users(full_name, phone, whatsapp, province, area, address)', { count: 'exact' }).eq('merchant_id', merchant.id).eq('order_type', 'merchant');
@@ -55,7 +57,7 @@ router.get('/orders', asyncHandler(async (req, res) => {
 }));
 
 router.get('/sales', asyncHandler(async (req, res) => {
-  const merchant = await merchantForUser(req.user.id);
+  const merchant = await resolveMerchant(req);
   if (!merchant) throw new AppError(404, 'ملف الشركة غير موجود', 'MERCHANT_NOT_FOUND');
   const { data, error } = await supabaseAdmin.from('orders').select('id, order_number, total, currency, status, created_at, completed_at').eq('merchant_id', merchant.id).eq('order_type', 'merchant').in('status', ['payment_received', 'completed', 'archive']).order('created_at', { ascending: false });
   if (error) throw error;
@@ -63,7 +65,7 @@ router.get('/sales', asyncHandler(async (req, res) => {
 }));
 
 router.put('/profile', validate({ body: merchantProfileSchema }), asyncHandler(async (req, res) => {
-  const merchant = await merchantForUser(req.user.id);
+  const merchant = await resolveMerchant(req);
   if (!merchant) throw new AppError(404, 'ملف الشركة غير موجود', 'MERCHANT_NOT_FOUND');
   const { error } = await supabaseAdmin.from('merchants').update({
     company_name: req.body.companyName,

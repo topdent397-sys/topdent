@@ -23,7 +23,8 @@
     },
     "plugins": [
       "expo-image-picker",
-      "expo-asset"
+      "expo-asset",
+      "expo-font"
     ],
     "extra": {
       "apiUrl": "https://topdent-production-654a.up.railway.app/api"

@@ -71,14 +71,25 @@ export function notFound(req, res) {
   res.status(404).json({ error: 'مسار API غير موجود', code: 'ROUTE_NOT_FOUND' });
 }
 
-export async function merchantForUser(userId) {
+export async function merchantForUser(userId, fallbackCompanyId = null) {
   const { data, error } = await supabaseAdmin
     .from('merchants')
     .select('*')
     .eq('user_id', userId)
     .maybeSingle();
   if (error) throw error;
-  return data;
+  if (data) return data;
+  if (fallbackCompanyId) {
+    const { data: byCompany, error: compError } = await supabaseAdmin.from('merchants').select('*').eq('id', fallbackCompanyId).maybeSingle();
+    if (compError) throw compError;
+    if (byCompany) return byCompany;
+  }
+  const { data: assignment } = await supabaseAdmin.from('user_role_assignments').select('company_id').eq('user_id', userId).eq('is_active', true).not('company_id', 'is', null).limit(1).maybeSingle();
+  if (assignment?.company_id) {
+    const { data: byAssign } = await supabaseAdmin.from('merchants').select('*').eq('id', assignment.company_id).maybeSingle();
+    if (byAssign) return byAssign;
+  }
+  return null;
 }
 
 export const normalizeArabic = (value = '') => value.trim().toLocaleLowerCase('ar');

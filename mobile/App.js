@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, Image, I18nManager, KeyboardAvoidingView, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { NavigationContainer, useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import { Alert, Image, I18nManager, Linking, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { NavigationContainer, useFocusEffect } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import { StatusBar } from 'expo-status-bar';
 import api, { errorText } from './src/api';
 import { colors, shadow } from './src/theme';
-import { DashboardScreen, DentalCardScreen, Favorites, ForgotPassword, MerchantRegister, MoreMenu, NotificationsScreen, OfferDetail, Offers, ProfileScreen, RentalsScreen } from './src/expandedScreens';
+import { DashboardScreen, Favorites, ForgotPassword, MoreMenu, NotificationsScreen, OfferDetail, Offers, ProfileScreen, RentalsScreen } from './src/expandedScreens';
 import { InvoiceDetail, OperationsScreen } from './src/operationsScreens';
 import { CommerceCart, CommerceCheckout, CommerceProduct, CommerceProducts } from './src/commerceScreens';
 import { AdminFormsScreen } from './src/adminScreens';
@@ -38,20 +39,17 @@ function ProductCard({ product, onPress }) { return <Card onPress={onPress}><Vie
 function Home({ navigation }) {
   const [featured, setFeatured] = useState([]);
   const [banners, setBanners] = useState([]);
-  const [offers, setOffers] = useState([]);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const load = async () => {
     setRefreshing(true);
     try {
-      const [r, b, o] = await Promise.all([
+      const [r, b] = await Promise.all([
         api.get('/products?limit=8&status=approved'),
-        api.get('/catalog/banners').catch(() => ({ banners: [] })),
-        api.get('/catalog/offers?limit=8').catch(() => ({ offers: [] }))
+        api.get('/catalog/banners').catch(() => ({ banners: [] }))
       ]);
       setFeatured(r.products || []);
       setBanners(b.banners || []);
-      setOffers(o.offers || []);
     } catch {} finally {
       setRefreshing(false);
     }
@@ -78,18 +76,6 @@ function Home({ navigation }) {
   return (
     <ScrollView style={styles.screen} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={load} />}>
       <Header title="منصة طب الأسنان" subtitle="سوق موثوق للشراء والبيع والاستئجار" />
-      {offers.length > 0 ? (
-        <View style={styles.ticker}>
-          <Text style={styles.tickerBadge}>العروض النشطة</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tickerScroll}>
-            {offers.map((o) => (
-              <Pressable key={o.id} onPress={() => navigation.navigate('OfferDetail', { id: o.id })} style={styles.tickerItem}>
-                <Text style={styles.tickerText}>{o.title}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-      ) : null}
       {active ? (
         <Pressable onPress={() => openBanner(active)} style={styles.banner}>
           <Image source={{ uri: active.image_url }} style={styles.bannerImage} />
@@ -106,19 +92,13 @@ function Home({ navigation }) {
           ))}
         </View>
       ) : null}
-      <View style={styles.hero}>
-        <Text style={styles.heroKicker}>كل ما تحتاجه عيادتك</Text>
-        <Text style={styles.heroTitle}>منتجات أصلية وخدمات موثوقة</Text>
-        <Text style={styles.heroText}>تصفح المنتجات من شركات وأطباء موثوقين، واعرض منتجاتك للبيع بكل سهولة.</Text>
-        <Button title="تصفح المنتجات" onPress={() => navigation.navigate('Products')} />
+      <View style={styles.quickGrid}>
+        <Card onPress={() => navigation.navigate('Sell')}><Ionicons name="add-circle-outline" size={28} color={colors.primary} /><Text style={styles.quickTitle}>اعرض منتجك للبيع</Text><Text style={styles.muted}>جديد أو مستعمل</Text></Card>
+        <Card onPress={() => navigation.navigate('Offers')}><Ionicons name="pricetag-outline" size={28} color={colors.primary} /><Text style={styles.quickTitle}>العروض والخصومات</Text><Text style={styles.muted}>شاهد كل العروض</Text></Card>
       </View>
       <View style={styles.quickGrid}>
-        <Card onPress={() => navigation.navigate('Sell')}><Text style={styles.quickIcon}>＋</Text><Text style={styles.quickTitle}>اعرض منتجك للبيع</Text><Text style={styles.muted}>جديد أو مستعمل</Text></Card>
-        <Card onPress={() => navigation.navigate('Offers')}><Text style={styles.quickIcon}>★</Text><Text style={styles.quickTitle}>العروض والخصومات</Text><Text style={styles.muted}>شاهد كل العروض</Text></Card>
-      </View>
-      <View style={styles.quickGrid}>
-        <Card onPress={() => navigation.navigate('Rentals')}><Text style={styles.quickIcon}>↔</Text><Text style={styles.quickTitle}>الاستئجار</Text><Text style={styles.muted}>معدات وطلبات إيجار</Text></Card>
-        <Card onPress={() => navigation.navigate('DentalCard')}><Text style={styles.quickIcon}>✍</Text><Text style={styles.quickTitle}>تصميم كرت طبيب</Text><Text style={styles.muted}>اطلب تصميمك</Text></Card>
+        <Card onPress={() => navigation.navigate('Rentals')}><Ionicons name="repeat-outline" size={28} color={colors.primary} /><Text style={styles.quickTitle}>الاستئجار</Text><Text style={styles.muted}>معدات وطلبات إيجار</Text></Card>
+        <Card onPress={() => navigation.navigate('Products')}><Ionicons name="search-outline" size={28} color={colors.primary} /><Text style={styles.quickTitle}>اكتشف المنتجات</Text><Text style={styles.muted}>ابحث حسب احتياجك</Text></Card>
       </View>
       <View style={styles.sectionHead}>
         <Text style={styles.sectionTitle}>منتجات مميزة</Text>
@@ -128,16 +108,6 @@ function Home({ navigation }) {
     </ScrollView>
   );
 }
-
-function Products({ navigation }) { const [products, setProducts] = useState([]); const [search, setSearch] = useState(''); const [loading, setLoading] = useState(false); const load = async () => { setLoading(true); try { const q = search ? `&search=${encodeURIComponent(search)}` : ''; const r = await api.get(`/products?limit=50${q}`); setProducts(r.products || []); } catch { setProducts([]); } finally { setLoading(false); } }; useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t); }, [search]); return <View style={styles.screen}><Header title="المنتجات" subtitle="ابحث وقارن واشترِ بثقة" /><View style={styles.search}><TextInput value={search} onChangeText={setSearch} placeholder="ابحث عن منتج أو شركة" placeholderTextColor={colors.muted} style={styles.searchInput} /><Text style={styles.searchIcon}>⌕</Text></View>{loading ? <Empty text="جارٍ تحميل المنتجات…" /> : products.length ? <FlatList data={products} keyExtractor={(item) => item.id} renderItem={({ item }) => <ProductCard product={item} onPress={() => navigation.navigate('Product', { id: item.id })} />} contentContainerStyle={styles.list} /> : <Empty text="لم يتم العثور على منتجات" />}</View>; }
-
-function Product({ route, navigation }) { const [product, setProduct] = useState(null); const [qty, setQty] = useState(1); const [busy, setBusy] = useState(false); useEffect(() => { api.get(`/products/${route.params.id}`).then(setProduct).catch(() => Alert.alert('خطأ', 'تعذر تحميل المنتج')); }, [route.params.id]); const add = async () => { setBusy(true); try { await api.post('/cart/items', { productId: product.id, quantity: qty }); Alert.alert('تمت الإضافة', 'تمت إضافة المنتج إلى السلة'); } catch (e) { Alert.alert('تعذر الإضافة', errorText(e)); } finally { setBusy(false); } }; if (!product) return <Empty text="جارٍ تحميل المنتج…" />; return <ScrollView style={styles.screen}><Pressable onPress={() => navigation.goBack()}><Text style={styles.back}>‹ العودة</Text></Pressable>{imageOf(product) ? <Image source={{ uri: imageOf(product) }} style={styles.detailImage} /> : <View style={styles.detailPlaceholder}><Text style={styles.placeholderText}>TopDent</Text></View>}<Text style={styles.detailTitle}>{product.name}</Text><Text style={styles.muted}>{product.company_name || 'منتج موثوق'}</Text><Text style={styles.detailPrice}>{money(product.price)}</Text><Text style={styles.description}>{product.description || 'منتج متخصص لاحتياجات طب الأسنان.'}</Text><View style={styles.quantity}><Text style={styles.label}>الكمية</Text><View style={styles.quantityRow}><Pressable onPress={() => setQty(Math.max(1, qty - 1))} style={styles.qty}><Text>−</Text></Pressable><Text style={styles.qtyValue}>{qty}</Text><Pressable onPress={() => setQty(qty + 1)} style={styles.qty}><Text>＋</Text></Pressable></View></View><Button title={busy ? 'جارٍ الإضافة…' : 'أضف إلى السلة'} onPress={add} disabled={busy || !product.stock_quantity} /><Button title="الشراء الآن" secondary onPress={() => { add(); navigation.navigate('Cart'); }} /></ScrollView>; }
-
-function Auth({ onLogin }) { const [mode, setMode] = useState('login'); const [form, setForm] = useState({ email: '', password: '', fullName: '', phone: '' }); const [busy, setBusy] = useState(false); const submit = async () => { setBusy(true); try { const r = mode === 'login' ? await api.post('/auth/login', { email: form.email, password: form.password }) : await api.post('/auth/register', form); await AsyncStorage.multiSet([['token', r.token], ['user', JSON.stringify(r.user)]]); onLogin(r.user); } catch (e) { Alert.alert('تعذر المتابعة', errorText(e)); } finally { setBusy(false); } }; return <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}><Header title={mode === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب'} subtitle="حساب واحد لكل مشترياتك وطلباتك" />{mode === 'register' && <Field label="الاسم الكامل" value={form.fullName} onChangeText={(v) => setForm({ ...form, fullName: v })} /> }<Field label="البريد الإلكتروني" value={form.email} onChangeText={(v) => setForm({ ...form, email: v })} keyboardType="email-address" /><Field label="كلمة المرور" value={form.password} onChangeText={(v) => setForm({ ...form, password: v })} secureTextEntry />{mode === 'register' && <Field label="رقم الهاتف" value={form.phone} onChangeText={(v) => setForm({ ...form, phone: v })} keyboardType="phone-pad" /> }<Button title={busy ? 'جارٍ المعالجة…' : mode === 'login' ? 'دخول آمن' : 'إنشاء الحساب'} onPress={submit} disabled={busy} /><Pressable onPress={() => setMode(mode === 'login' ? 'register' : 'login')} style={styles.switch}><Text style={styles.link}>{mode === 'login' ? 'ليس لديك حساب؟ أنشئ حساباً' : 'لديك حساب؟ سجّل الدخول'}</Text></Pressable></KeyboardAvoidingView>; }
-
-function Cart({ navigation }) { const [cart, setCart] = useState({ items: [] }); const [loading, setLoading] = useState(true); const load = async () => { try { setCart(await api.get('/cart')); } catch {} finally { setLoading(false); } }; useFocusEffect(React.useCallback(() => { load(); }, [])); const remove = async (id) => { await api.delete(`/cart/items/${id}`); load(); }; if (loading) return <Empty text="جارٍ تحميل السلة…" />; return <ScrollView style={styles.screen}><Header title="سلة المشتريات" subtitle={`${cart.items?.length || 0} منتجات`} />{cart.items?.length ? cart.items.map((item) => <Card key={item.id}><View style={styles.cartRow}><View style={{ flex: 1 }}><Text style={styles.productName}>{item.product?.name || item.name}</Text><Text style={styles.price}>{money(item.product?.price || item.price)}</Text><Text style={styles.muted}>الكمية: {item.quantity}</Text></View><Button title="حذف" danger secondary onPress={() => remove(item.id)} /></View></Card>) : <Empty text="السلة فارغة" />}{cart.items?.length ? <><Text style={styles.total}>الإجمالي: {money(cart.total)}</Text><Button title="متابعة إلى الدفع" onPress={() => navigation.navigate('Checkout')} /></> : null}</ScrollView>; }
-
-function Checkout({ navigation }) { const [form, setForm] = useState({ customerName: '', customerPhone: '', province: '', area: '', address: '', deliverySpeed: 'normal', paymentProvider: 'cash' }); const [busy, setBusy] = useState(false); const submit = async () => { setBusy(true); try { const cart = await api.get('/cart'); await api.post('/orders', { ...form, items: cart.items.map((i) => ({ productId: i.product?.id || i.product_id, quantity: i.quantity })), paymentProvider: form.paymentProvider }); Alert.alert('تم الطلب', 'تم إنشاء طلبك بنجاح', [{ text: 'عرض الطلبات', onPress: () => navigation.navigate('Account') }]); } catch (e) { Alert.alert('تعذر إنشاء الطلب', errorText(e)); } finally { setBusy(false); } }; return <ScrollView style={styles.screen}><Header title="إتمام الطلب" subtitle="بيانات التوصيل والدفع" /><Field label="الاسم" value={form.customerName} onChangeText={(v) => setForm({ ...form, customerName: v })} /><Field label="الهاتف" value={form.customerPhone} onChangeText={(v) => setForm({ ...form, customerPhone: v })} keyboardType="phone-pad" /><Field label="المحافظة" value={form.province} onChangeText={(v) => setForm({ ...form, province: v })} /><Field label="المنطقة" value={form.area} onChangeText={(v) => setForm({ ...form, area: v })} /><Field label="العنوان بالتفصيل" value={form.address} onChangeText={(v) => setForm({ ...form, address: v })} multiline /><Text style={styles.label}>سرعة التوصيل</Text><View style={styles.chips}>{['normal', 'urgent', 'very_urgent'].map((v) => <Pressable key={v} onPress={() => setForm({ ...form, deliverySpeed: v })} style={[styles.chip, form.deliverySpeed === v && styles.chipActive]}><Text>{v === 'normal' ? 'عادي' : v === 'urgent' ? 'مستعجل' : 'مستعجل جداً'}</Text></Pressable>)}</View><Button title={busy ? 'جارٍ إنشاء الطلب…' : 'تأكيد الطلب'} onPress={submit} disabled={busy} /></ScrollView>; }
 
 function Sell({ navigation }) {
   const [form, setForm] = useState({ name: '', nameEn: '', category: '', price: '', stockQuantity: '1', description: '', condition: 'new', deliveryInsideProvince: true, deliveryOutsideProvince: true, sellerProvince: '', deliveryCostByProvince: {}, sellerName: '', sellerPhone: '', sellerWhatsapp: '', usageDurationMonths: '', defects: '', sellerDeclaration: false, platformFeeAccepted: false, images: [] });
@@ -166,12 +136,30 @@ function Sell({ navigation }) {
     if (val === '') delete next[pname]; else next[pname] = Math.max(0, Number(val) || 0);
     setForm((current) => ({ ...current, deliveryCostByProvince: next }));
   };
-  const pick = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', 'اسمح للتطبيق بالوصول إلى الصور');
-    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, quality: 0.8 });
-    if (!r.canceled) setForm({ ...form, images: [...form.images, ...r.assets.map((a) => a.uri)] });
+  const addPickedImages = (assets = []) => {
+    const remaining = Math.max(0, 10 - form.images.length);
+    if (!remaining) return Alert.alert('الحد الأقصى للصور', 'يمكنك رفع عشر صور كحد أقصى.');
+    const next = assets.map((asset) => asset.uri).filter(Boolean).slice(0, remaining);
+    setForm((current) => ({ ...current, images: [...current.images, ...next].slice(0, 10) }));
   };
+  const pickGallery = async () => {
+    if (form.images.length >= 10) return Alert.alert('الحد الأقصى للصور', 'يمكنك رفع عشر صور كحد أقصى.');
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', 'اسمح للتطبيق بالوصول إلى الصور.');
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 10 - form.images.length, quality: 0.82 });
+    if (!result.canceled) addPickedImages(result.assets);
+  };
+  const pickCamera = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', 'اسمح للتطبيق باستخدام الكاميرا لالتقاط صورة للمنتج.');
+    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.82, allowsEditing: false });
+    if (!result.canceled) addPickedImages(result.assets);
+  };
+  const pick = () => Alert.alert('إضافة صور للمنتج', 'اختر طريقة إضافة الصور', [
+    { text: 'التقاط صورة بالكاميرا', onPress: pickCamera },
+    { text: 'اختيار من المعرض', onPress: pickGallery },
+    { text: 'إلغاء', style: 'cancel' }
+  ]);
   const submit = async () => {
     if (!form.name.trim()) return Alert.alert('بيانات ناقصة', 'اسم المنتج مطلوب');
     if (!form.price || Number(form.price) <= 0) return Alert.alert('بيانات ناقصة', 'السعر مطلوب');
@@ -181,13 +169,10 @@ function Sell({ navigation }) {
     if (form.condition === 'used' && !form.platformFeeAccepted) return Alert.alert('بيانات ناقصة', 'يجب الموافقة على شروط ورسوم المنصة');
     setBusy(true);
     try {
-      const uploaded = [];
-      for (const uri of form.images) {
-        const body = new FormData();
-        body.append('files', { uri, name: `topdent-${Date.now()}.jpg`, type: 'image/jpeg' });
-        const result = await api.post('/upload/images', body, { headers: { 'Content-Type': 'multipart/form-data' } });
-        uploaded.push(...(result.files || []).map((item) => item.url));
-      }
+      const body = new FormData();
+      form.images.forEach((uri, index) => body.append('files', { uri, name: `topdent-${Date.now()}-${index}.jpg`, type: 'image/jpeg' }));
+      const uploadResult = await api.post('/upload/images', body, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const uploaded = (uploadResult.files || []).map((item) => item.url);
       const endpoint = isCustomer ? '/users/listings' : '/products';
       const payload = {
         name: form.name.trim(),
@@ -297,22 +282,31 @@ function Sell({ navigation }) {
         </View>
       ) : null}
 
-      <Button title={`اختيار الصور (${form.images.length}) — مطلوب صورتان على الأقل`} secondary onPress={pick} />
-      <Button title={busy ? 'جارٍ الإرسال…' : 'إرسال للمراجعة'} onPress={submit} disabled={busy} />
+      <Text style={styles.sectionTitle}>صور المنتج ({form.images.length}/10)</Text>
+      <Text style={styles.muted}>أضف صورتين على الأقل. ارفع صوراً واضحة للمنتج من زوايا مختلفة.</Text>
+      {form.images.length > 0 ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.imagePreviewList}>{form.images.map((uri, index) => <View key={`${uri}-${index}`} style={styles.imagePreviewWrap}><Image source={{ uri }} style={styles.imagePreview} /><Pressable accessibilityRole="button" accessibilityLabel={`حذف الصورة ${index + 1}`} style={styles.removeImage} onPress={() => setForm((current) => ({ ...current, images: current.images.filter((_, i) => i !== index) }))}><Ionicons name="close-circle" size={25} color="#b91c1c" /></Pressable></View>)}</ScrollView> : null}
+      <Button title="إضافة صور للمنتج" secondary onPress={pick} disabled={form.images.length >= 10} />
+      <Button title={busy ? 'جارٍ رفع الصور وإرسال المنتج…' : 'إرسال للمراجعة'} onPress={submit} disabled={busy} />
     </ScrollView>
   );
 }
 
-function Rentals() { return <ScrollView style={styles.screen}><Header title="الاستئجار" subtitle="معدات وأدوات متاحة للإيجار" /><Empty text="طلبات الإيجار متاحة من خلال حسابك. سيتم تحميل العروض من الخادم عند نشرها." /></ScrollView>; }
-function Notifications() { const [items, setItems] = useState([]); useFocusEffect(React.useCallback(() => { api.get('/users/notifications?limit=100').then((r) => setItems(r.notifications || [])).catch(() => {}); }, [])); return <ScrollView style={styles.screen}><Header title="الإشعارات" />{items.length ? items.map((n) => <Card key={n.id}><Text style={styles.productName}>{n.title}</Text><Text style={styles.description}>{n.message}</Text></Card>) : <Empty text="لا توجد إشعارات" />}</ScrollView>; }
-
-function Dashboard({ user }) { const [data, setData] = useState(null); const [loading, setLoading] = useState(true); useFocusEffect(React.useCallback(() => { const url = user?.role === 'customer' ? '/orders/customer/my-orders' : '/platform/dashboard'; api.get(url).then(setData).catch(() => {}).finally(() => setLoading(false)); }, [user?.role])); return <ScrollView style={styles.screen}><Header title="لوحة التحكم" subtitle={user?.fullName || user?.email} />{loading ? <Empty text="جارٍ تحميل بيانات لوحتك…" /> : <><View style={styles.stats}><Card><Text style={styles.statValue}>{data?.orders?.length || data?.stats?.orders || 0}</Text><Text style={styles.muted}>الطلبات</Text></Card><Card><Text style={styles.statValue}>{data?.products?.length || data?.stats?.products || 0}</Text><Text style={styles.muted}>المنتجات</Text></Card></View><Text style={styles.sectionTitle}>صلاحياتك ودورك</Text><Card><Text style={styles.productName}>{user?.role || 'customer'}</Text><Text style={styles.muted}>{(user?.roles || []).join(' • ') || 'حساب عميل'}</Text><Text style={styles.description}>تُطبّق صلاحيات API نفسها الموجودة في الموقع، وتظهر لك العمليات المسموحة حسب دورك ونطاقك.</Text></Card></>}</ScrollView>; }
-
 function Account({ user, logout, navigation }) { return <ScrollView style={styles.screen}><Header title="حسابي" subtitle={user ? user.fullName || user.email : 'سجّل الدخول للاستفادة من كامل الميزات'} />{user ? <><Card><Text style={styles.productName}>{user.fullName || user.email}</Text><Text style={styles.muted}>{user.email}</Text><Text style={styles.muted}>{user.role || 'customer'}</Text></Card><Button title="لوحة التحكم" onPress={() => navigation.navigate('Dashboard')} /><Button title="الإشعارات" secondary onPress={() => navigation.navigate('Notifications')} /><Button title="تسجيل الخروج" danger secondary onPress={logout} /></> : <Button title="تسجيل الدخول أو إنشاء حساب" onPress={() => navigation.navigate('Auth')} />}</ScrollView>; }
 
-function MainTabs({ user, logout }) { const tabIcon = (glyph) => ({ focused, color }) => <Text style={{ color: focused ? colors.primary : color, fontSize: 20, fontWeight: '800' }}>{glyph}</Text>; return <Tabs.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarLabelStyle: { fontFamily: Platform.select({ android: 'sans-serif', ios: 'System' }), fontSize: 12 }, tabBarStyle: { height: 64, paddingBottom: 8, paddingTop: 6 } }}><Tabs.Screen name="Home" component={Home} options={{ title: 'الرئيسية', tabBarIcon: tabIcon('⌂') }} /><Tabs.Screen name="Products" component={CommerceProducts} options={{ title: 'المنتجات', tabBarIcon: tabIcon('▦') }} /><Tabs.Screen name="Cart" component={CommerceCart} options={{ title: 'السلة', tabBarIcon: tabIcon('🛒') }} /><Tabs.Screen name="More" options={{ title: 'المزيد', tabBarIcon: tabIcon('☰') }}>{(props) => <MoreMenu {...props} user={user} />}</Tabs.Screen><Tabs.Screen name="Account" options={{ title: 'حسابي', tabBarIcon: tabIcon('♙') }}>{(props) => <Account {...props} user={user} logout={logout} />}</Tabs.Screen></Tabs.Navigator>; }
+function MainTabs({ user, logout }) {
+  const tabIcon = (name) => { const TabIcon = function TabIcon({ focused, color }) { return <Ionicons name={focused ? name : `${name}-outline`} size={22} color={focused ? colors.primary : color} />; }; return TabIcon; };
+  function renderMore(props) { return <MoreMenu {...props} user={user} />; }
+  function renderAccount(props) { return <Account {...props} user={user} logout={logout} />; }
+  return <Tabs.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary, tabBarLabelStyle: { fontFamily: Platform.select({ android: 'sans-serif', ios: 'System' }), fontSize: 12 }, tabBarStyle: { height: 64, paddingBottom: 8, paddingTop: 6 } }}>
+    <Tabs.Screen name="Home" component={Home} options={{ title: 'الرئيسية', tabBarIcon: tabIcon('home') }} />
+    <Tabs.Screen name="Products" component={CommerceProducts} options={{ title: 'المنتجات', tabBarIcon: tabIcon('grid') }} />
+    <Tabs.Screen name="Cart" component={CommerceCart} options={{ title: 'السلة', tabBarIcon: tabIcon('cart') }} />
+    <Tabs.Screen name="More" options={{ title: 'المزيد', tabBarIcon: tabIcon('ellipsis-horizontal-circle') }}>{renderMore}</Tabs.Screen>
+    <Tabs.Screen name="Account" options={{ title: 'حسابي', tabBarIcon: tabIcon('person-circle') }}>{renderAccount}</Tabs.Screen>
+  </Tabs.Navigator>;
+}
 
-function App() { const [user, setUser] = useState(null); const [ready, setReady] = useState(false); useEffect(() => { AsyncStorage.getItem('user').then((raw) => raw && setUser(JSON.parse(raw))).finally(() => setReady(true)); }, []); const logout = async () => { await AsyncStorage.multiRemove(['token', 'user']); setUser(null); }; if (!ready) return <View style={styles.loading}><Text style={styles.brand}>TopDent</Text><Text style={styles.muted}>جارٍ التحضير…</Text></View>; return <NavigationContainer><StatusBar style="light" backgroundColor={colors.primaryDark} /><Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Main">{() => <MainTabs user={user} logout={logout} />}</Stack.Screen><Stack.Screen name="Auth">{({ navigation }) => <AuthScreen navigation={navigation} onLogin={(u) => { setUser(u); navigation.goBack(); }} />}</Stack.Screen><Stack.Screen name="Product" component={CommerceProduct} /><Stack.Screen name="Checkout" component={CommerceCheckout} /><Stack.Screen name="Sell" component={Sell} /><Stack.Screen name="Rentals" component={RentalsScreen} /><Stack.Screen name="Notifications" component={NotificationsScreen} /><Stack.Screen name="Dashboard">{({ navigation }) => <DashboardScreen user={user} navigation={navigation} />}</Stack.Screen><Stack.Screen name="Operations">{({ navigation, route }) => <OperationsScreen user={user} navigation={navigation} route={route} />}</Stack.Screen><Stack.Screen name="AdminForms" component={AdminFormsScreen} /><Stack.Screen name="AdvancedAdmin" component={AdvancedAdminScreen} /><Stack.Screen name="OrderDetail" component={OrderDetailScreen} /><Stack.Screen name="AssignDriver" component={AssignDriverScreen} /><Stack.Screen name="ProductEdit" component={ProductEditScreen} /><Stack.Screen name="RoleAssignment" component={RoleAssignmentScreen} /><Stack.Screen name="InvoiceDetail" component={InvoiceDetail} /><Stack.Screen name="Favorites" component={Favorites} /><Stack.Screen name="Offers" component={Offers} /><Stack.Screen name="OfferDetail" component={OfferDetail} /><Stack.Screen name="DentalCard" component={DentalCardScreen} /><Stack.Screen name="Profile">{({ navigation }) => <ProfileScreen onLogout={logout} navigation={navigation} />}</Stack.Screen><Stack.Screen name="ForgotPassword" component={ForgotPassword} /><Stack.Screen name="MerchantRegister" component={MerchantRegisterScreen} /></Stack.Navigator></NavigationContainer>; }
+function App() { const [user, setUser] = useState(null); const [ready, setReady] = useState(false); useEffect(() => { AsyncStorage.getItem('user').then((raw) => raw && setUser(JSON.parse(raw))).finally(() => setReady(true)); }, []); const logout = async () => { await AsyncStorage.multiRemove(['token', 'user']); setUser(null); }; if (!ready) return <View style={styles.loading}><Text style={styles.brand}>TopDent</Text><Text style={styles.muted}>جارٍ التحضير…</Text></View>; return <NavigationContainer><StatusBar style="light" backgroundColor={colors.primaryDark} /><Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Main">{() => <MainTabs user={user} logout={logout} />}</Stack.Screen><Stack.Screen name="Auth">{({ navigation }) => <AuthScreen navigation={navigation} onLogin={(u) => { setUser(u); navigation.goBack(); }} />}</Stack.Screen><Stack.Screen name="Product" component={CommerceProduct} /><Stack.Screen name="Checkout" component={CommerceCheckout} /><Stack.Screen name="Sell" component={Sell} /><Stack.Screen name="Rentals" component={RentalsScreen} /><Stack.Screen name="Notifications" component={NotificationsScreen} /><Stack.Screen name="Dashboard">{({ navigation }) => <DashboardScreen user={user} navigation={navigation} />}</Stack.Screen><Stack.Screen name="Operations">{({ navigation, route }) => <OperationsScreen user={user} navigation={navigation} route={route} />}</Stack.Screen><Stack.Screen name="AdminForms" component={AdminFormsScreen} /><Stack.Screen name="AdvancedAdmin" component={AdvancedAdminScreen} /><Stack.Screen name="OrderDetail" component={OrderDetailScreen} /><Stack.Screen name="AssignDriver" component={AssignDriverScreen} /><Stack.Screen name="ProductEdit" component={ProductEditScreen} /><Stack.Screen name="RoleAssignment" component={RoleAssignmentScreen} /><Stack.Screen name="InvoiceDetail" component={InvoiceDetail} /><Stack.Screen name="Favorites" component={Favorites} /><Stack.Screen name="Offers" component={Offers} /><Stack.Screen name="OfferDetail" component={OfferDetail} /><Stack.Screen name="Profile">{({ navigation }) => <ProfileScreen onLogout={logout} navigation={navigation} />}</Stack.Screen><Stack.Screen name="ForgotPassword" component={ForgotPassword} /><Stack.Screen name="MerchantRegister" component={MerchantRegisterScreen} /></Stack.Navigator></NavigationContainer>; }
 
 const styles = StyleSheet.create({ screen: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: 18 }, loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, brand: { color: colors.primary, fontSize: 30, fontWeight: '900', marginBottom: 5 }, header: { paddingTop: 22, paddingBottom: 18 }, title: { color: colors.ink, fontSize: 26, fontWeight: '900', textAlign: 'right' }, subtitle: { color: colors.muted, fontSize: 14, marginTop: 5, textAlign: 'right' }, hero: { backgroundColor: colors.primary, borderRadius: 24, padding: 22, marginBottom: 22, ...shadow }, heroKicker: { color: '#dbeafe', fontWeight: '700', textAlign: 'right' }, heroTitle: { color: '#fff', fontSize: 25, fontWeight: '900', marginVertical: 8, textAlign: 'right' }, heroText: { color: '#dbeafe', lineHeight: 23, textAlign: 'right', marginBottom: 16 }, button: { backgroundColor: colors.primary, borderRadius: 13, paddingVertical: 14, paddingHorizontal: 18, alignItems: 'center', marginTop: 12 }, buttonSecondary: { backgroundColor: '#fff', borderWidth: 1, borderColor: colors.primary }, buttonDanger: { borderColor: '#fecaca' }, buttonText: { color: '#fff', fontSize: 15, fontWeight: '800' }, buttonSecondaryText: { color: colors.primary }, disabled: { opacity: 0.5 }, sectionHead: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }, sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '900', marginVertical: 14, textAlign: 'right' }, link: { color: colors.primary, fontWeight: '800' }, card: { backgroundColor: colors.card, borderRadius: 17, padding: 14, marginBottom: 12, ...shadow }, productRow: { flexDirection: 'row-reverse', alignItems: 'center' }, productImage: { width: 90, height: 90, borderRadius: 13, backgroundColor: colors.bg }, productPlaceholder: { width: 90, height: 90, borderRadius: 13, alignItems: 'center', justifyContent: 'center', backgroundColor: '#dbeafe' }, placeholderText: { color: colors.primary, fontSize: 22, fontWeight: '900' }, productInfo: { flex: 1, marginRight: 13 }, productName: { color: colors.ink, fontSize: 16, fontWeight: '800', textAlign: 'right' }, muted: { color: colors.muted, fontSize: 13, textAlign: 'right', marginTop: 4 }, price: { color: colors.primaryDark, fontSize: 16, fontWeight: '900', textAlign: 'right', marginTop: 7 }, stock: { color: colors.success, fontSize: 12, textAlign: 'right', marginTop: 4 }, quickGrid: { flexDirection: 'row-reverse', marginVertical: 6 }, quickIcon: { color: colors.primary, fontSize: 28, textAlign: 'right' }, quickTitle: { color: colors.ink, fontWeight: '900', textAlign: 'right', marginTop: 6 }, search: { backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, borderColor: colors.border, flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 14, marginBottom: 12 }, searchInput: { flex: 1, color: colors.ink, textAlign: 'right', paddingVertical: 13 }, searchIcon: { color: colors.primary, fontSize: 26, marginLeft: 9 }, list: { paddingBottom: 20 }, empty: { alignItems: 'center', justifyContent: 'center', padding: 35 }, field: { marginBottom: 13 }, label: { color: colors.ink, fontWeight: '800', textAlign: 'right', marginBottom: 6 }, input: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 14, paddingVertical: 12, color: colors.ink, textAlign: 'right', fontSize: 15 }, textarea: { minHeight: 100, textAlignVertical: 'top' }, switch: { alignItems: 'center', padding: 18 }, back: { color: colors.primary, fontSize: 16, fontWeight: '800', marginBottom: 12 }, detailImage: { width: '100%', height: 270, borderRadius: 20, backgroundColor: '#fff', resizeMode: 'contain' }, detailPlaceholder: { width: '100%', height: 220, borderRadius: 20, backgroundColor: '#dbeafe', alignItems: 'center', justifyContent: 'center' }, detailTitle: { color: colors.ink, fontSize: 26, fontWeight: '900', textAlign: 'right', marginTop: 18 }, detailPrice: { color: colors.primaryDark, fontSize: 22, fontWeight: '900', textAlign: 'right', marginVertical: 13 }, description: { color: '#475569', lineHeight: 25, textAlign: 'right', marginTop: 10 }, quantity: { marginTop: 18, alignItems: 'flex-end' }, quantityRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 }, qty: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }, qtyValue: { paddingHorizontal: 18, fontWeight: '900', color: colors.ink }, cartRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 10 }, total: { color: colors.primaryDark, fontSize: 20, fontWeight: '900', textAlign: 'right', marginVertical: 12 }, chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8, marginVertical: 8 }, chip: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 20, backgroundColor: '#fff', borderWidth: 1, borderColor: colors.border }, chipActive: { borderColor: colors.primary, backgroundColor: '#dbeafe' }, stats: { flexDirection: 'row-reverse', gap: 12 }, statValue: { color: colors.primary, fontSize: 28, fontWeight: '900', textAlign: 'right' },
   ticker: { backgroundColor: '#fef3c7', borderRadius: 14, padding: 10, marginBottom: 14, flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },

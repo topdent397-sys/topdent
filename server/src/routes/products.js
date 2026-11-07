@@ -102,7 +102,7 @@ router.get('/', validate({ query: productQuerySchema }), asyncHandler(async (req
   let query = supabaseAdmin.from('products').select(`
     id, name, name_en, condition, price, currency, price_syp, stock_quantity, seller_provinces, stock_by_province, delivery_cost_by_province, created_at,
     merchant:merchants!inner(id, company_name, logo_url, province, area), images:product_images(image_url, is_primary)
-  `, { count: 'exact' }).eq('is_active', true).eq('is_approved', true).eq('status', 'approved');
+  `, { count: page > 1 ? 'exact' : 'estimated' }).eq('is_active', true).eq('is_approved', true).eq('status', 'approved');
 
   if (category) query = query.eq('category', category);
   if (subCategory) query = query.eq('sub_category', subCategory);
@@ -129,8 +129,8 @@ router.get('/', validate({ query: productQuerySchema }), asyncHandler(async (req
     query = query.in('id', ids);
   }
   if (sortBy === 'oldest') query = query.order('created_at', { ascending: true });
-  else if (sortBy === 'cheapest') query = query.order('price_syp', { ascending: true });
-  else if (sortBy === 'expensive') query = query.order('price_syp', { ascending: false });
+  else if (sortBy === 'cheapest' || sortBy === 'price_asc') query = query.order('price_syp', { ascending: true });
+  else if (sortBy === 'expensive' || sortBy === 'price_desc') query = query.order('price_syp', { ascending: false });
   else query = query.order('created_at', { ascending: false });
 
   const { data, error, count } = await query.range(from, to);

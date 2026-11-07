@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api, { errorText } from './api';
@@ -20,8 +20,8 @@ export function OperationsScreen({ user, navigation, route }) {
   const roles = user?.roles || []; const isMerchant = user?.role === 'merchant' || roles.includes('company_manager') || roles.includes('company_admin'); const isDriver = user?.role === 'driver' || roles.includes('platform_driver') || roles.includes('company_driver'); const tabs = isMerchant ? merchantTabs : isDriver ? [{ id: 'overview', label: 'الرئيسية' }, { id: 'orders', label: 'مهام التوصيل' }] : adminTabs;
   const [active, setActive] = useState(route?.params?.section || 'overview'); const [data, setData] = useState({}); const [loading, setLoading] = useState(false); const [query, setQuery] = useState(''); const [error, setError] = useState('');
   const urls = useMemo(() => ({ overview: isMerchant ? '/merchants/dashboard' : isDriver ? '/orders/driver/assignments' : '/platform/dashboard', orders: isMerchant ? '/merchants/orders' : isDriver ? '/orders/driver/assignments' : '/platform/orders?limit=50', products: isMerchant ? '/merchants/products' : '/platform/products?limit=50', sales: '/merchants/sales', delivery: '/delivery-rates/merchant', profile: '/merchants/dashboard', companies: '/platform/companies?limit=50', drivers: '/platform/drivers?limit=50', invoices: '/platform/invoices?limit=50', roles: '/platform/roles', catalog: '/platform/catalog/categories', audit: '/platform/audit-log?limit=50', settings: '/platform/settings' }), [isMerchant, isDriver]);
-  const load = async (section = active) => { setLoading(true); setError(''); try { const r = await api.get(urls[section]); setData((current) => ({ ...current, [section]: r })); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } };
-  useFocusEffect(React.useCallback(() => { load(active); }, [active, urls]));
+  const load = useCallback(async (section = active) => { setLoading(true); setError(''); try { const r = await api.get(urls[section]); setData((current) => ({ ...current, [section]: r })); } catch (e) { setError(errorText(e)); } finally { setLoading(false); } }, [active, urls]);
+  useFocusEffect(React.useCallback(() => { load(active); }, [active, load]));
   const request = async (method, path, body) => { try { await api[method](path, body); Alert.alert('تم الحفظ', 'تم تحديث البيانات بنجاح'); load(active); } catch (e) { Alert.alert('تعذر التنفيذ', errorText(e)); } };
   const source = data[active] || {}; const list = source.orders || source.products || source.companies || source.drivers || source.invoices || source.roles || source.categories || source.logs || source.audit || source.assignments || [];
   const visible = Array.isArray(list) ? list.filter((x) => JSON.stringify(x).toLowerCase().includes(query.toLowerCase())) : [];

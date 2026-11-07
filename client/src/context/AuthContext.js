@@ -50,6 +50,15 @@ export function AuthProvider({ children }) {
     window.localStorage.setItem('token', token);
     window.localStorage.setItem('user', JSON.stringify(nextUser));
     setUser(nextUser);
+    api.get('/auth/verify').then((response) => {
+      if (response?.user) {
+        setUser((prev) => {
+          const merged = { ...(prev || {}), ...response.user };
+          window.localStorage.setItem('user', JSON.stringify(merged));
+          return merged;
+        });
+      }
+    }).catch(() => {});
   };
 
   const logout = () => {
