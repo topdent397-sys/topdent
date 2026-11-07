@@ -22,6 +22,7 @@ jobs:
       run:
         working-directory: mobile
     env:
+      NODE_ENV: production
       EXPO_PUBLIC_API_URL: ${{ inputs.api_url || vars.TOPDENT_API_URL || 'https://fyfikbj.onrender.com/api' }}
     steps:
       - name: Checkout
@@ -36,8 +37,32 @@ jobs:
         run: npm ci
       - name: Generate native Android project
         run: npx expo prebuild --platform android --non-interactive --no-install
+      - name: Configure Gradle memory for GitHub runner
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('android/gradle.properties')
+          lines = path.read_text().splitlines()
+          properties = {
+              'org.gradle.jvmargs': '-Xmx4g -XX:MaxMetaspaceSize=1g -Dfile.encoding=UTF-8',
+              'org.gradle.parallel': 'false',
+              'org.gradle.workers.max': '2',
+          }
+          for key, value in properties.items():
+              prefix = f'{key}='
+              indexes = [i for i, line in enumerate(lines) if line.startswith(prefix)]
+              if indexes:
+                  lines[indexes[0]] = f'{prefix}{value}'
+                  for index in reversed(indexes[1:]):
+                      lines.pop(index)
+              else:
+                  lines.append(f'{prefix}{value}')
+          path.write_text('\n'.join(lines) + '\n')
+          PY
+          grep -E '^(org\.gradle\.jvmargs|org\.gradle\.parallel|org\.gradle\.workers\.max)=' android/gradle.properties
       - name: Build release APK
-        run: cd android && ./gradlew assembleRelease --no-daemon --stacktrace
+        run: cd android && ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
