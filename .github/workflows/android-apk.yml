@@ -61,11 +61,31 @@ jobs:
           path.write_text('\n'.join(lines) + '\n')
           PY
           grep -E '^(org\.gradle\.jvmargs|org\.gradle\.parallel|org\.gradle\.workers\.max)=' android/gradle.properties
+      - name: Download Gradle distribution with retries
+        run: |
+          GRADLE_VERSION=8.13
+          GRADLE_HOME="$RUNNER_TEMP/gradle-${GRADLE_VERSION}"
+          GRADLE_ZIP="$RUNNER_TEMP/gradle-${GRADLE_VERSION}-bin.zip"
+          for attempt in 1 2 3 4 5; do
+            echo "Gradle distribution download attempt ${attempt}/5"
+            if curl -fL --retry 5 --retry-all-errors --retry-delay 10 --connect-timeout 30 --max-time 900 \
+              "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o "$GRADLE_ZIP"; then
+              break
+            fi
+            rm -f "$GRADLE_ZIP"
+            if [ "$attempt" -eq 5 ]; then exit 1; fi
+            sleep 15
+          done
+          rm -rf "$GRADLE_HOME"
+          mkdir -p "$GRADLE_HOME"
+          unzip -q "$GRADLE_ZIP" -d "$RUNNER_TEMP"
+          echo "GRADLE_BIN=$GRADLE_HOME/bin/gradle" >> "$GITHUB_ENV"
+          "$GRADLE_HOME/bin/gradle" --version
       - name: Build release APK
         run: |
           for attempt in 1 2 3; do
             echo "Gradle release build attempt ${attempt}/3"
-            if (cd android && ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace); then
+            if (cd android && "$GRADLE_BIN" assembleRelease --no-daemon --max-workers=2 --stacktrace); then
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then
