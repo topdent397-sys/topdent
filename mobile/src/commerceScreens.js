@@ -3,6 +3,7 @@ import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInp
 import { useFocusEffect } from '@react-navigation/native';
 import api, { errorText } from './api';
 import { Ionicons } from '@expo/vector-icons';
+import { BrandMark } from './brand';
 
 const C = {
   primary: '#2563eb',
@@ -77,7 +78,7 @@ function ProductCard({ product, onPress }) {
         {imageOf(product) ? (
           <Image source={{ uri: imageOf(product) }} style={s.thumb} />
         ) : (
-          <View style={s.thumbPlaceholder}><Text style={s.logo}>TD</Text></View>
+          <View style={s.thumbPlaceholder}><BrandMark size={50} light /></View>
         )}
         <View style={s.flex}>
           <Text style={s.cardTitle}>{product.name}</Text>
@@ -125,7 +126,7 @@ export function CommerceProducts({ navigation }) {
   return (
     <View style={s.screen}>
       <ScrollView contentContainerStyle={s.content}>
-        <Text style={s.logoText}>TopDent</Text>
+        <View style={s.logoRow}><BrandMark size={34} light /><Text style={s.logoText}>TopDent</Text></View>
         <Text style={s.title}>المنتجات</Text>
         <Text style={s.subtitle}>ابحث وقارن واشترِ بثقة</Text>
         <Field label="البحث" value={form.search} onChangeText={(v) => setForm({ ...form, search: v, page: 1 })} placeholder="اسم المنتج أو الشركة" />
@@ -244,7 +245,7 @@ export function CommerceProduct({ route, navigation }) {
       {imageOf(product) ? (
         <Image source={{ uri: imageOf(product) }} style={s.heroImage} />
       ) : (
-        <View style={s.heroPlaceholder}><Text style={s.logo}>TopDent</Text></View>
+        <View style={s.heroPlaceholder}><BrandMark size={82} light /></View>
       )}
       <View style={s.chips}>
         <View style={[s.chip, s.chipStatic]}>
@@ -344,7 +345,7 @@ export function CommerceCart({ navigation }) {
 
   const update = async (id, quantity) => {
     try {
-      await api.patch(`/cart/items/${id}`, { quantity });
+      await api.patch(`/cart/${id}`, { quantity });
       load();
     } catch (e) {
       Alert.alert('تعذر التحديث', errorText(e));
@@ -353,7 +354,7 @@ export function CommerceCart({ navigation }) {
 
   const remove = async (id) => {
     try {
-      await api.delete(`/cart/items/${id}`);
+      await api.delete(`/cart/${id}`);
       load();
     } catch (e) {
       Alert.alert('تعذر الحذف', errorText(e));
@@ -366,7 +367,7 @@ export function CommerceCart({ navigation }) {
   return (
     <View style={s.screen}>
       <ScrollView contentContainerStyle={s.content}>
-        <Text style={s.logoText}>TopDent</Text>
+        <View style={s.logoRow}><BrandMark size={34} light /><Text style={s.logoText}>TopDent</Text></View>
         <Text style={s.title}>سلة الشراء</Text>
         {loading ? (
           <Text style={s.muted}>جارٍ تحميل السلة...</Text>
@@ -378,13 +379,13 @@ export function CommerceCart({ navigation }) {
                   {imageOf(i.product) ? (
                     <Image source={{ uri: imageOf(i.product) }} style={s.thumb} />
                   ) : (
-                    <View style={s.thumbPlaceholder}><Text style={s.logo}>TD</Text></View>
+                    <View style={s.thumbPlaceholder}><BrandMark size={50} light /></View>
                   )}
                   <View style={s.flex}>
                     <Text style={s.cardTitle}>{i.product?.name}</Text>
                     <Text style={s.price}>{money(i.unit_price || i.product?.price, i.currency || i.product?.currency)}</Text>
                     <View style={s.row}>
-                      <Btn title="−" secondary onPress={() => update(i.id, Math.max(0, i.quantity - 1))} />
+                      <Btn title="−" secondary onPress={() => i.quantity <= 1 ? remove(i.id) : update(i.id, i.quantity - 1)} />
                       <Text style={s.qty}>{i.quantity}</Text>
                       <Btn title="＋" secondary onPress={() => update(i.id, i.quantity + 1)} />
                     </View>
@@ -466,9 +467,15 @@ export function CommerceCheckout({ navigation }) {
   }, [items, form.province, form.deliverySpeed, form.discountCode]);
 
   const submit = async () => {
-    if (!form.acceptsReturnPolicy || !quote) {
-      return Alert.alert('بيانات ناقصة', 'وافق على السياسة واختر المحافظة وانتظر حساب الفاتورة');
-    }
+    if (form.customerName.trim().length < 6) return Alert.alert('بيانات ناقصة', 'أدخل الاسم الكامل (6 محارف على الأقل).');
+    if (!form.customerPhone.trim()) return Alert.alert('بيانات ناقصة', 'رقم الهاتف مطلوب للتوصيل.');
+    if (!form.province) return Alert.alert('بيانات ناقصة', 'اختر المحافظة للتوصيل.');
+    if (form.area.trim().length < 2) return Alert.alert('بيانات ناقصة', 'أدخل المنطقة أو الحي.');
+    if (form.address.trim().length < 5) return Alert.alert('بيانات ناقصة', 'أدخل عنواناً تفصيلياً مناسباً للتوصيل.');
+    if (form.deliverySpeed === 'very_urgent' && !form.deliveryTimeSlot.trim()) return Alert.alert('بيانات ناقصة', 'حدد وقت التوصيل الفوري أو اختر سرعة أخرى.');
+    if (form.paymentMethod === 'external_transfer' && (!form.paymentProvider.trim() || !form.paymentReference.trim())) return Alert.alert('بيانات ناقصة', 'أدخل مزود التحويل ورقم العملية.');
+    if (!form.acceptsReturnPolicy) return Alert.alert('الموافقة مطلوبة', 'وافق على سياسة الضمان والإرجاع قبل تأكيد الطلب.');
+    if (!quote) return Alert.alert('جارٍ تجهيز الفاتورة', 'انتظر لحظات حتى يتم حساب التوصيل والإجمالي ثم أعد المحاولة.');
     setBusy(true);
     try {
       const r = await api.post('/orders', {
@@ -488,12 +495,12 @@ export function CommerceCheckout({ navigation }) {
 
   return (
     <ScrollView style={s.screen} contentContainerStyle={s.content}>
-      <Text style={s.logoText}>TopDent</Text>
+      <View style={s.logoRow}><BrandMark size={34} light /><Text style={s.logoText}>TopDent</Text></View>
       <Text style={s.title}>إتمام الطلب</Text>
       <Text style={s.section}>بيانات الاستلام</Text>
       <Field label="الاسم الثلاثي" value={form.customerName} onChangeText={(v) => setForm({ ...form, customerName: v })} />
       <Field label="رقم الهاتف" value={form.customerPhone} onChangeText={(v) => setForm({ ...form, customerPhone: v })} keyboardType="phone-pad" />
-      <Field label="رقم واتساب" value={form.customerWhatsapp} onChangeText={(v) => setForm({ ...form, customerWhatsapp: v })} keyboardType="phone-pad" />
+      <Field label="رقم واتساب (اختياري)" value={form.customerWhatsapp} onChangeText={(v) => setForm({ ...form, customerWhatsapp: v })} keyboardType="phone-pad" />
       <Text style={s.label}>المحافظة</Text>
       <ScrollView horizontal contentContainerStyle={s.chips}>
         {provinces.map((p) => (
@@ -504,7 +511,7 @@ export function CommerceCheckout({ navigation }) {
       </ScrollView>
       <Field label="المنطقة" value={form.area} onChangeText={(v) => setForm({ ...form, area: v })} />
       <Field label="العنوان التفصيلي" value={form.address} onChangeText={(v) => setForm({ ...form, address: v })} multiline />
-      <Field label="الجامعة أو العيادة" value={form.universityClinic} onChangeText={(v) => setForm({ ...form, universityClinic: v })} />
+      <Field label="الجامعة أو العيادة (اختياري)" value={form.universityClinic} onChangeText={(v) => setForm({ ...form, universityClinic: v })} />
       <Text style={s.section}>التوصيل والدفع</Text>
       <View style={s.chips}>
         {[['normal', 'عادي'], ['urgent', 'سريع'], ['very_urgent', 'فوري']].map(([v, t]) => (
@@ -513,6 +520,7 @@ export function CommerceCheckout({ navigation }) {
           </Pressable>
         ))}
       </View>
+      {form.deliverySpeed === 'very_urgent' ? <Field label="وقت التوصيل الفوري" value={form.deliveryTimeSlot} onChangeText={(v) => setForm({ ...form, deliveryTimeSlot: v })} placeholder="مثال: اليوم 4:00 مساءً" /> : null}
       <View style={s.chips}>
         {[['cash_on_delivery', 'الدفع عند التسليم'], ['external_transfer', 'تحويل خارجي']].map(([v, t]) => (
           <Pressable key={v} onPress={() => setForm({ ...form, paymentMethod: v })} style={[s.chip, form.paymentMethod === v && s.chipActive]}>
@@ -526,8 +534,8 @@ export function CommerceCheckout({ navigation }) {
           <Field label="رقم العملية" value={form.paymentReference} onChangeText={(v) => setForm({ ...form, paymentReference: v })} />
         </>
       )}
-      <Field label="رمز الخصم" value={form.discountCode} onChangeText={(v) => setForm({ ...form, discountCode: v })} />
-      <Field label="ملاحظات" value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} multiline />
+      <Field label="رمز الخصم (اختياري)" value={form.discountCode} onChangeText={(v) => setForm({ ...form, discountCode: v })} />
+      <Field label="ملاحظات (اختياري)" value={form.notes} onChangeText={(v) => setForm({ ...form, notes: v })} multiline />
       <Pressable onPress={() => setForm({ ...form, acceptsReturnPolicy: !form.acceptsReturnPolicy })} style={s.check}>
         <Text>{form.acceptsReturnPolicy ? '☑' : '☐'} أوافق على سياسة الضمان والإرجاع وحفظ بيانات الطلب</Text>
       </Pressable>
@@ -559,7 +567,8 @@ export function CommerceCheckout({ navigation }) {
           <Text style={s.bigPrice}>الإجمالي: {money(quote.total)}</Text>
         </View>
       )}
-      <Btn title={busy ? 'جارٍ تأكيد الطلب...' : 'تأكيد الطلب'} onPress={submit} disabled={busy || !quote} />
+      {!quote && form.province ? <Text style={s.muted}>جارٍ حساب الفاتورة والتوصيل… يمكنك الضغط على الزر بعد ظهور الإجمالي.</Text> : null}
+      <Btn title={busy ? 'جارٍ تأكيد الطلب...' : 'تأكيد الطلب'} onPress={submit} disabled={busy} />
     </ScrollView>
   );
 }
@@ -567,6 +576,7 @@ export function CommerceCheckout({ navigation }) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
   content: { padding: 18, paddingBottom: 45 },
+  logoRow: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8, marginBottom: 8 },
   logoText: { color: C.primary, fontSize: 18, fontWeight: '900', textAlign: 'right', marginBottom: 8 },
   title: { color: C.ink, fontSize: 28, fontWeight: '900', textAlign: 'right' },
   nameEn: { color: C.muted, fontSize: 13, textAlign: 'right', writingDirection: 'ltr' },
