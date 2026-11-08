@@ -23,7 +23,7 @@ jobs:
         working-directory: mobile
     env:
       NODE_ENV: production
-      EXPO_PUBLIC_API_URL: ${{ inputs.api_url || vars.TOPDENT_API_URL || 'https://fyfikbj.onrender.com/api' }}
+      EXPO_PUBLIC_API_URL: ${{ inputs.api_url || vars.TOPDENT_API_URL || 'https://topdent-production-654a.up.railway.app/api' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
