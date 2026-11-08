@@ -37,6 +37,15 @@ jobs:
         run: npm ci
       - name: Generate native Android project
         run: CI=1 npx expo prebuild --platform android --no-install
+      - name: Cache Gradle distribution and dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
       - name: Configure Gradle memory for GitHub runner
         run: |
           python3 - <<'PY'
@@ -59,8 +68,21 @@ jobs:
               else:
                   lines.append(f'{prefix}{value}')
           path.write_text('\n'.join(lines) + '\n')
+          wrapper = Path('android/gradle/wrapper/gradle-wrapper.properties')
+          wrapper_lines = wrapper.read_text().splitlines()
+          timeout_prefix = 'networkTimeout='
+          timeout_line = f'{timeout_prefix}120000'
+          timeout_indexes = [i for i, line in enumerate(wrapper_lines) if line.startswith(timeout_prefix)]
+          if timeout_indexes:
+              wrapper_lines[timeout_indexes[0]] = timeout_line
+              for index in reversed(timeout_indexes[1:]):
+                  wrapper_lines.pop(index)
+          else:
+              wrapper_lines.append(timeout_line)
+          wrapper.write_text('\n'.join(wrapper_lines) + '\n')
           PY
           grep -E '^(org\.gradle\.jvmargs|org\.gradle\.parallel|org\.gradle\.workers\.max)=' android/gradle.properties
+          grep '^networkTimeout=' android/gradle/wrapper/gradle-wrapper.properties
       - name: Build release APK
         run: |
           for attempt in 1 2 3; do
