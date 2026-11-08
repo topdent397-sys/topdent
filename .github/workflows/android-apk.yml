@@ -66,14 +66,27 @@ jobs:
           GRADLE_VERSION=8.13
           GRADLE_HOME="$RUNNER_TEMP/gradle-${GRADLE_VERSION}"
           GRADLE_ZIP="$RUNNER_TEMP/gradle-${GRADLE_VERSION}-bin.zip"
+          GRADLE_URLS=(
+            "https://mirrors.cloud.tencent.com/gradle/gradle-${GRADLE_VERSION}-bin.zip"
+            "https://repo.huaweicloud.com/gradle/gradle-${GRADLE_VERSION}-bin.zip"
+            "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip"
+          )
           for attempt in 1 2 3 4 5; do
             echo "Gradle distribution download attempt ${attempt}/5"
-            if curl -fL --retry 5 --retry-all-errors --retry-delay 10 --connect-timeout 30 --max-time 900 \
-              "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o "$GRADLE_ZIP"; then
+            for url in "${GRADLE_URLS[@]}"; do
+              echo "Downloading from ${url}"
+              if curl -fL --retry 3 --retry-all-errors --retry-delay 5 --connect-timeout 30 --max-time 900 "$url" -o "$GRADLE_ZIP"; then
+                break 2
+              fi
+              rm -f "$GRADLE_ZIP"
+            done
+            if [ "$attempt" -eq 5 ]; then
+              echo "All Gradle distribution mirrors failed"
+              exit 1
+            fi
+            if [ -f "$GRADLE_ZIP" ]; then
               break
             fi
-            rm -f "$GRADLE_ZIP"
-            if [ "$attempt" -eq 5 ]; then exit 1; fi
             sleep 15
           done
           rm -rf "$GRADLE_HOME"
