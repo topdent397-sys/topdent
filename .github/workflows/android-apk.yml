@@ -36,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Generate native Android project
-        run: npx expo prebuild --platform android --non-interactive --no-install
+        run: CI=1 npx expo prebuild --platform android --no-install
       - name: Configure Gradle memory for GitHub runner
         run: |
           python3 - <<'PY'
@@ -62,7 +62,18 @@ jobs:
           PY
           grep -E '^(org\.gradle\.jvmargs|org\.gradle\.parallel|org\.gradle\.workers\.max)=' android/gradle.properties
       - name: Build release APK
-        run: cd android && ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace
+        run: |
+          for attempt in 1 2 3; do
+            echo "Gradle release build attempt ${attempt}/3"
+            if (cd android && ./gradlew assembleRelease --no-daemon --max-workers=2 --stacktrace); then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Gradle failed; retrying after a short delay for a transient distribution/dependency timeout..."
+              sleep 15
+            fi
+          done
+          exit 1
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
