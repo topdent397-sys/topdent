@@ -22,8 +22,18 @@ const money = (value, currency = 'SYP') =>
 
 const imageOf = (p) => {
   const source = Array.isArray(p?.images) ? p.images.find((entry) => entry?.is_primary) || p.images[0] : p?.images;
-  if (typeof source === 'string') return source;
-  return source?.image_url || source?.imageUrl || source?.url || p?.image_url || p?.imageUrl || p?.url || null;
+  const resolve = (value) => {
+    if (!value) return null;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return null;
+      try { return resolve(JSON.parse(trimmed)); } catch { return trimmed; }
+    }
+    if (Array.isArray(value)) return value.map(resolve).find(Boolean) || null;
+    if (typeof value === 'object') return resolve(value.image_url || value.imageUrl || value.url || value.path || value.src);
+    return null;
+  };
+  return resolve(source) || resolve(p?.image_url) || resolve(p?.imageUrl) || resolve(p?.image_urls) || resolve(p?.url) || resolve(p?.merchant?.logo_url);
 };
 
 const cleanPhone = (p) => (p || '').replace(/[^0-9+]/g, '');

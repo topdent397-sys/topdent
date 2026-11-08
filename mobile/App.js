@@ -22,10 +22,24 @@ I18nManager.forceRTL(true);
 const Stack = createNativeStackNavigator();
 const Tabs = createBottomTabNavigator();
 const money = (value) => `${Number(value || 0).toLocaleString('ar-SY')} ل.س`;
+const imageUrl = (value) => {
+  if (!value) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+      return imageUrl(JSON.parse(trimmed));
+    } catch {
+      return trimmed;
+    }
+  }
+  if (Array.isArray(value)) return value.map(imageUrl).find(Boolean) || null;
+  if (typeof value === 'object') return imageUrl(value.image_url || value.imageUrl || value.url || value.path || value.src);
+  return null;
+};
 const imageOf = (item) => {
   const source = Array.isArray(item?.images) ? item.images.find((entry) => entry?.is_primary) || item.images[0] : item?.images;
-  if (typeof source === 'string') return source;
-  return source?.image_url || source?.imageUrl || source?.url || item?.image_url || item?.imageUrl || item?.url || null;
+  return imageUrl(source) || imageUrl(item?.image_url) || imageUrl(item?.imageUrl) || imageUrl(item?.image_urls) || imageUrl(item?.url) || imageUrl(item?.merchant?.logo_url);
 };
 
 function Button({ title, onPress, secondary = false, danger = false, disabled = false }) { return <Pressable disabled={disabled} onPress={onPress} style={[styles.button, secondary && styles.buttonSecondary, danger && styles.buttonDanger, disabled && styles.disabled]}><Text style={[styles.buttonText, secondary && styles.buttonSecondaryText]}>{title}</Text></Pressable>; }
