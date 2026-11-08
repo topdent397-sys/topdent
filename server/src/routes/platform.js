@@ -75,7 +75,7 @@ async function findCompany(id, actor, requiredPermission = 'companies.view') {
 router.get('/dashboard', requirePermission('dashboard.view'), asyncHandler(async (req, res) => {
   const companyIds = req.user.hasGlobalScope ? null : req.user.companyIds;
   const [usersResult, companiesResult, productsResult, ordersResult, receiptsResult] = await Promise.all([
-    supabaseAdmin.from('users').select('id, account_status, is_active'),
+    req.user.hasGlobalScope ? supabaseAdmin.from('users').select('id, account_status, is_active') : Promise.resolve({ data: [], error: null }),
     companyIds ? supabaseAdmin.from('merchants').select('id, is_active').in('id', companyIds) : supabaseAdmin.from('merchants').select('id, is_active'),
     companyIds ? supabaseAdmin.from('products').select('id, status, merchant_id').in('merchant_id', companyIds) : supabaseAdmin.from('products').select('id, status, merchant_id'),
     companyIds ? supabaseAdmin.from('orders').select('id, status, total, merchant_id').eq('order_type', 'merchant').in('merchant_id', companyIds) : supabaseAdmin.from('orders').select('id, status, total, merchant_id').eq('order_type', 'merchant'),
@@ -128,7 +128,7 @@ router.get('/reports', requirePermission('reports.view'), asyncHandler(async (re
 
 router.get('/companies', requirePermission('companies.view'), asyncHandler(async (req, res) => {
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
-  let query = supabaseAdmin.from('merchants').select('*, manager:users!merchants_user_id_fkey(id, full_name, email)', { count: 'exact' });
+  let query = supabaseAdmin.from('merchants').select(req.user.hasGlobalScope ? '*, manager:users!merchants_user_id_fkey(id, full_name, email)' : '*', { count: 'exact' });
   query = companyQuery(query, req.user);
   if (req.query.status === 'active') query = query.eq('is_active', true);
   if (req.query.status === 'inactive') query = query.eq('is_active', false);
@@ -166,7 +166,7 @@ router.post('/companies', requireAllPermissions(['companies.create', 'users.crea
 router.get('/companies/:id', requirePermission('companies.view'), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
   const company = await findCompany(req.params.id, req.user);
   const [teamResult, productsResult, ordersResult] = await Promise.all([
-    supabaseAdmin.from('user_role_assignments').select('*, user:users(id, full_name, email, phone, account_status), role:roles(key, name_ar)').eq('company_id', company.id).eq('is_active', true),
+    req.user.hasGlobalScope ? supabaseAdmin.from('user_role_assignments').select('*, user:users(id, full_name, email, phone, account_status), role:roles(key, name_ar)').eq('company_id', company.id).eq('is_active', true) : Promise.resolve({ data: [], error: null }),
     supabaseAdmin.from('products').select('id, name, status, stock_quantity').eq('merchant_id', company.id).order('created_at', { ascending: false }).limit(20),
     supabaseAdmin.from('orders').select('id, order_number, status, total, created_at').eq('merchant_id', company.id).eq('order_type', 'merchant').order('created_at', { ascending: false }).limit(20)
   ]);
@@ -220,14 +220,14 @@ router.patch('/companies/:id/approval', requirePermission('companies.update'), v
   res.json({ message: req.body.approved ? 'تمت الموافقة على الشركة' : 'تم رفض الشركة مع تسجيل السبب', company: data });
 }));
 
-router.get('/companies/:id/team', requirePermission('companies.manage_team'), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
+router.get('/companies/:id/team', requireGlobalScope, requirePermission('companies.manage_team'), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
   await findCompany(req.params.id, req.user, 'companies.manage_team');
   const { data, error } = await supabaseAdmin.from('user_role_assignments').select('*, user:users(id, full_name, email, phone, account_status), role:roles(key, name_ar)').eq('company_id', req.params.id).order('created_at', { ascending: false });
   if (error) throw error;
   res.json({ team: data || [] });
 }));
 
-router.get('/users', requirePermission('users.view'), asyncHandler(async (req, res) => {
+router.get('/users', requireGlobalScope, requirePermission('users.view'), asyncHandler(async (req, res) => {
   const { page, limit, from, to } = pageRange(req.query.page, req.query.limit);
   let assignments = supabaseAdmin.from('user_role_assignments').select('user_id').eq('is_active', true);
   if (!req.user.hasGlobalScope) assignments = assignments.in('company_id', req.user.companyIds);
@@ -241,7 +241,7 @@ router.get('/users', requirePermission('users.view'), asyncHandler(async (req, r
   res.json({ users: data || [], pagination: { page, limit, total: count || 0, pages: Math.ceil((count || 0) / limit) } });
 }));
 
-router.post('/users', requirePermission('users.create'), validate({ body: platformUserCreateSchema }), asyncHandler(async (req, res) => {
+router.post('/users', requireGlobalScope, requirePermission('users.create'), validate({ body: platformUserCreateSchema }), asyncHandler(async (req, res) => {
   if (req.body.companyId) assertCompanyScope(req.user, req.body.companyId);
   if (!req.body.companyId && !req.user.hasGlobalScope) throw new AppError(403, 'إنشاء مستخدم عام يتطلب نطاق المنصة', 'GLOBAL_SCOPE_REQUIRED');
   const passwordHash = await bcrypt.hash(req.body.password, 12);
@@ -267,7 +267,7 @@ router.post('/users', requirePermission('users.create'), validate({ body: platfo
   res.status(201).json({ message: 'تم إنشاء الحساب بحالة معلّقة. عيّن الدور ثم فعّله.', user: data });
 }));
 
-router.get('/users/:id', requirePermission('users.view'), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
+router.get('/users/:id', requireGlobalScope, requirePermission('users.view'), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
   const { data: user, error } = await supabaseAdmin.from('users').select('id, full_name, email, phone, whatsapp, province, area, role, account_status, is_active, created_at').eq('id', req.params.id).maybeSingle();
   if (error) throw error;
   if (!user) throw new AppError(404, 'المستخدم غير موجود', 'USER_NOT_FOUND');
@@ -277,7 +277,7 @@ router.get('/users/:id', requirePermission('users.view'), validate({ params: idP
   res.json({ user, roleAssignments: assignments || [] });
 }));
 
-router.patch('/users/:id/status', requirePermission('users.disable'), validate({ params: idParamsSchema, body: userStatusSchema }), asyncHandler(async (req, res) => {
+router.patch('/users/:id/status', requireGlobalScope, requirePermission('users.disable'), validate({ params: idParamsSchema, body: userStatusSchema }), asyncHandler(async (req, res) => {
   if (req.params.id === req.user.id && req.body.accountStatus !== 'active') throw new AppError(409, 'لا يمكنك تعطيل حسابك من هذه الشاشة', 'SELF_DISABLE_BLOCKED');
   const { data: target, error: targetError } = await supabaseAdmin.from('users').select('id, account_status, is_active').eq('id', req.params.id).maybeSingle();
   if (targetError) throw targetError;
@@ -713,7 +713,7 @@ router.get('/banners', requireAnyPermission(['catalog.view', 'banners.view', 'of
   res.json({ banners: data });
 }));
 
-router.post('/banners', requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ body: bannerSchema }), asyncHandler(async (req, res) => {
+router.post('/banners', requireGlobalScope, requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ body: bannerSchema }), asyncHandler(async (req, res) => {
   await assertCatalogOwnership(req.user, { productId: req.body.productId, offerId: req.body.offerId });
   if (!req.user.hasGlobalScope && !req.user.isPlatformOwner && !req.body.productId && !req.body.offerId) throw new AppError(403, 'يجب ربط البنر بمحتوى شركتك', 'COMPANY_SCOPE_REQUIRED');
   const { data, error } = await supabaseAdmin.from('banners').insert({
@@ -730,7 +730,7 @@ router.post('/banners', requireAnyPermission(['catalog.manage', 'banners.manage'
   res.status(201).json({ banner: data });
 }));
 
-router.patch('/banners/:id', requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ params: idParamsSchema, body: updateBannerSchema }), asyncHandler(async (req, res) => {
+router.patch('/banners/:id', requireGlobalScope, requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ params: idParamsSchema, body: updateBannerSchema }), asyncHandler(async (req, res) => {
   const { data: existingBanner, error: existingBannerError } = await supabaseAdmin.from('banners').select('id, product_id, offer_id').eq('id', req.params.id).maybeSingle();
   if (existingBannerError) throw existingBannerError;
   if (!existingBanner) throw new AppError(404, 'البنر غير موجود', 'BANNER_NOT_FOUND');
@@ -753,7 +753,7 @@ router.patch('/banners/:id', requireAnyPermission(['catalog.manage', 'banners.ma
   res.json({ banner: data });
 }));
 
-router.delete('/banners/:id', requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
+router.delete('/banners/:id', requireGlobalScope, requireAnyPermission(['catalog.manage', 'banners.manage']), validate({ params: idParamsSchema }), asyncHandler(async (req, res) => {
   const { data: banner, error: bannerError } = await supabaseAdmin.from('banners').select('id, product_id, offer_id').eq('id', req.params.id).maybeSingle();
   if (bannerError) throw bannerError;
   if (!banner) throw new AppError(404, 'البنر غير موجود', 'BANNER_NOT_FOUND');
