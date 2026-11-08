@@ -155,7 +155,7 @@ function Sell({ navigation }) {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', permission.canAskAgain ? 'اسمح للتطبيق بالوصول إلى الصور ثم أعد المحاولة.' : 'فعّل صلاحية الصور للتطبيق من إعدادات الهاتف ثم أعد المحاولة.');
-      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: 10 - form.images.length, quality: 0.82 });
+      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsMultipleSelection: true, selectionLimit: 10 - form.images.length, quality: 0.82 });
       if (result?.canceled) return;
       const assets = Array.isArray(result?.assets) ? result.assets : (result?.uri ? [{ uri: result.uri }] : []);
       addPickedImages(assets);
@@ -167,7 +167,7 @@ function Sell({ navigation }) {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) return Alert.alert('الصلاحية مطلوبة', 'اسمح للتطبيق باستخدام الكاميرا لالتقاط صورة للمنتج.');
-      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.82, allowsEditing: false });
+      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.82, allowsEditing: false });
       if (result?.canceled) return;
       const assets = Array.isArray(result?.assets) ? result.assets : (result?.uri ? [{ uri: result.uri }] : []);
       addPickedImages(assets);
