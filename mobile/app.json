@@ -2,7 +2,7 @@
   "expo": {
     "name": "TopDent",
     "slug": "topdent",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "topdent",
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "com.topdent.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#0b3b8f"
       },
